@@ -16,6 +16,8 @@ ingress: true
 ingress_port: 8080
 panel_icon: "mdi:movie-play"
 panel_title: "Stremio Remote"
+privileged: true
+full_access: true
 ports:
   8080/tcp: 8080
 options:
@@ -28,6 +30,8 @@ options:
   trusted_networks: "192.168.0.0/16 10.0.0.0/8 172.16.0.0/12"
   media_disk_name: "EXTERNAL_USB"
   media_subpath: ""
+  mount_device: ""
+  mount_path: ""
 schema:
   port: port
   tmdb_api_key: str
@@ -38,3 +42,5 @@ schema:
   trusted_networks: str
   media_disk_name: str
   media_subpath: str?
+  mount_device: str?
+  mount_path: str?

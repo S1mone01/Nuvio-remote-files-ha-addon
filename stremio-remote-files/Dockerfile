@@ -9,7 +9,11 @@ RUN apk add --no-cache \
     python3 \
     py3-pip \
     curl \
-    bash
+    bash \
+    ntfs-3g \
+    exfat-utils \
+    fuse \
+    util-linux
 
 # Set up workdir
 WORKDIR /app
