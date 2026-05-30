@@ -57,5 +57,5 @@ app.include_router(admin_router)
 app.include_router(auth_router)
 
 # Serve static media files (replaces Caddy's file_server)
-# Must be mounted last so it doesn't shadow API routes
-app.mount("/", StaticFiles(directory="/media"), name="media")
+# Mounted under /media to avoid shadowing API routes
+app.mount("/media", StaticFiles(directory="/media"), name="media")
