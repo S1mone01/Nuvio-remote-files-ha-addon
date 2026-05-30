@@ -594,7 +594,7 @@ async function resetDB() {
 }
 
 function showModal() {
-    const link = window.location.origin + ingressPath + "/internal/manifest.json";
+    const link = "http://192.168.1.64:8080/internal/manifest.json";
     document.getElementById('manifest-url').textContent = link;
     document.getElementById('modal-overlay').style.display = 'flex';
 }
