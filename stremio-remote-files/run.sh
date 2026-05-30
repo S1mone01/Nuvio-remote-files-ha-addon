@@ -13,9 +13,9 @@ MEDIA_DISK_NAME=$(bashio::config 'media_disk_name')
 SUBPATH=$(bashio::config 'media_subpath')
 
 # Get Local IP
-INTERNAL_IP=$(bashio::network.ip)
+INTERNAL_IP=$(ip route get 1.1.1.1 | grep -oP 'src \K\S+')
 if [ -z "$INTERNAL_IP" ]; then
-    # Fallback to hostname -i if bashio fails
+    # Fallback for systems without ip route
     INTERNAL_IP=$(hostname -i | awk '{print $1}')
 fi
 MEDIA_BASE_URL="http://${INTERNAL_IP}:${PORT}"
