@@ -5,7 +5,8 @@ This module creates the FastAPI app, initializes the database on startup,
 and wires together the API routers.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +17,11 @@ from api.auth import router as auth_router
 from scanner import scan_movies, scan_series
 
 app = FastAPI()
+
+# Redirect root to configure page
+@app.get("/")
+def root():
+    return RedirectResponse(url="/internal/configure")
 
 # Stremio desktop/web clients require permissive CORS
 app.add_middleware(
