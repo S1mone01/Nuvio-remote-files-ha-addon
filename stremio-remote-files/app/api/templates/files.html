@@ -559,13 +559,9 @@ function basename(path) {
 
 // ── Actions ─────────────────────────────────────────────────────────
 async function manualScan() {
-    const token = prompt("Inserisci l'Admin Scan Token per avviare la scansione:");
-    if (!token) return;
-
     try {
         const resp = await fetch(ingressPath + '/admin/scan', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token }
+            method: 'POST'
         });
         const data = await resp.json();
         alert("Scansione avviata!");
@@ -577,13 +573,10 @@ async function manualScan() {
 
 async function resetDB() {
     if (!confirm("Sei sicuro di voler resettare il database e avviare una nuova scansione?")) return;
-    const token = prompt("Inserisci l'Admin Scan Token:");
-    if (!token) return;
 
     try {
         const resp = await fetch(ingressPath + '/admin/scan/rebuild', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token }
+            method: 'POST'
         });
         const data = await resp.json();
         alert("Reset completato!");

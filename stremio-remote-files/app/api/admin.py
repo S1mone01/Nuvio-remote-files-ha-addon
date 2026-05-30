@@ -113,8 +113,6 @@ def admin_page(request: Request):
 
 @router.post("/admin/scan")
 def admin_scan(request: Request):
-    require_admin_token(request)
-
     scan_movies()
     scan_series()
 
@@ -126,8 +124,6 @@ def admin_scan(request: Request):
 
 @router.post("/admin/scan/rebuild")
 def admin_scan_rebuild(request: Request):
-    require_admin_token(request)
-
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("DELETE FROM files")
         conn.execute("DELETE FROM episodes")
