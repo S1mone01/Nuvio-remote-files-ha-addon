@@ -22,6 +22,28 @@
             --serie-clr: #3fb950;
         }
 
+        /* ── Modern Scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+            border: 2px solid var(--bg);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--muted);
+        }
+        /* For Firefox */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) var(--bg);
+        }
+
         body {
             font-family: 'Sora', sans-serif;
             background: var(--bg);
@@ -595,7 +617,7 @@ async function resetDB() {
 }
 
 function showModal() {
-    const link = window.location.protocol + "//" + window.location.host + ingressPath + "/internal/manifest.json";
+    const link = "http://192.168.1.64:8080/internal/manifest.json";
     document.getElementById('manifest-url').textContent = link;
     document.getElementById('modal-overlay').style.display = 'flex';
 }
