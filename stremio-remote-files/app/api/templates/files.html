@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Remote Files – Libreria</title>
-    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;400;600;700&display=swap');
 
@@ -278,17 +278,15 @@
             font-size: 0.82rem;
             white-space: nowrap;
             color: var(--text);
-            text-align: right;
-            padding-right: 12px !important;
+            text-align: left;
             width: 140px;
         }
 
         .size-content {
             display: inline-flex;
             align-items: center;
-            justify-content: flex-end;
-            gap: 8px;
-            width: 100%;
+            justify-content: flex-start;
+            gap: 10px;
         }
 
         .play-btn {
@@ -434,23 +432,10 @@
             border-bottom: 1px solid var(--border);
         }
 
-        .video-js-wrap {
+        #dplayer {
             flex: 1;
             width: 100%;
-            position: relative;
-            background: #000;
         }
-
-        .video-js {
-            width: 100% !important;
-            height: 100% !important;
-        }
-
-        /* Video.js Matrix Theme Customization */
-        .vjs-matrix.video-js { color: var(--accent2); }
-        .vjs-matrix .vjs-big-play-button { border-color: var(--accent2); background-color: rgba(0,0,0,0.5); }
-        .vjs-matrix .vjs-play-progress, .vjs-matrix .vjs-volume-level { background-color: var(--accent2); }
-        .vjs-matrix .vjs-control-bar { background-color: rgba(22, 27, 34, 0.95); }
 
         .modal-header {
             font-weight: 700;
@@ -592,7 +577,7 @@
                 <th data-col="type">Tipo<span class="sort-icon"></span></th>
                 <th data-col="title">Titolo / Percorso<span class="sort-icon"></span></th>
                 <th data-col="resolution">Risoluzione<span class="sort-icon"></span></th>
-                <th data-col="size" class="sort-desc">Dimensione<span class="sort-icon"></span></th>
+                <th data-col="size" class="sort-desc" style="text-align: left">Dimensione<span class="sort-icon"></span></th>
             </tr>
         </thead>
         <tbody id="file-tbody"></tbody>
@@ -621,13 +606,11 @@
             <span id="player-title"></span>
             <span class="modal-close" onclick="closePlayer()">&times;</span>
         </div>
-        <div class="video-js-wrap">
-            <video id="vjs-player" class="video-js vjs-big-play-centered vjs-matrix" controls preload="auto" playsinline></video>
-        </div>
+        <div id="dplayer"></div>
     </div>
 </div>
 
-<script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────────────
 let allFiles   = [];
@@ -636,7 +619,7 @@ let searchQuery  = '';
 let sortKey      = 'size';
 let sortDir      = 'desc';
 let expandedGroups = new Set();
-let player = null;
+let dp = null;
 const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -672,9 +655,7 @@ function escapeHtml(s) {
 // ── Actions ─────────────────────────────────────────────────────────
 async function manualScan() {
     try {
-        const resp = await fetch(ingressPath + '/admin/scan', {
-            method: 'POST'
-        });
+        const resp = await fetch(ingressPath + '/admin/scan', { method: 'POST' });
         const data = await resp.json();
         alert("Scansione avviata!");
         loadFiles();
@@ -685,11 +666,8 @@ async function manualScan() {
 
 async function resetDB() {
     if (!confirm("Sei sicuro di voler resettare il database e avviare una nuova scansione?")) return;
-
     try {
-        const resp = await fetch(ingressPath + '/admin/scan/rebuild', {
-            method: 'POST'
-        });
+        const resp = await fetch(ingressPath + '/admin/scan/rebuild', { method: 'POST' });
         const data = await resp.json();
         alert("Reset completato!");
         loadFiles();
@@ -717,10 +695,7 @@ function copyLink() {
         const btn = document.getElementById('copy-btn');
         btn.textContent = 'Copiato!';
         btn.classList.add('success');
-        setTimeout(() => {
-            btn.textContent = 'Copia';
-            btn.classList.remove('success');
-        }, 2000);
+        setTimeout(() => { btn.textContent = 'Copia'; btn.classList.remove('success'); }, 2000);
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(updateBtn);
@@ -733,12 +708,7 @@ function copyLink() {
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        try {
-            document.execCommand('copy');
-            updateBtn();
-        } catch (err) {
-            console.error('Fallback copy failed', err);
-        }
+        try { document.execCommand('copy'); updateBtn(); } catch (err) { console.error('Fallback copy failed', err); }
         document.body.removeChild(textArea);
     }
 }
@@ -748,29 +718,31 @@ function playFile(path, title) {
     document.getElementById('player-title').textContent = title;
     document.getElementById('player-overlay').style.display = 'flex';
     
-    if (!player) {
-        player = videojs('vjs-player', {
-            autoplay: true,
-            controls: true,
-            responsive: true,
-            fluid: false,
-            playbackRates: [0.5, 1, 1.25, 1.5, 2],
-            language: 'it',
-            userActions: {
-                hotkeys: true
-            }
-        });
+    if (dp) {
+        dp.destroy();
     }
     
-    player.src({ type: 'video/mp4', src: url }); // Note: works for MKV too if browser supports codec
-    player.load();
-    player.play();
+    dp = new DPlayer({
+        container: document.getElementById('dplayer'),
+        autoplay: true,
+        theme: '#3fb950',
+        video: {
+            url: url,
+            type: 'auto',
+        },
+        contextmenu: [
+            {
+                text: 'Remote Files',
+                link: 'https://github.com/S1mone01/stremio-remote-files-ha-addon',
+            },
+        ],
+    });
 }
 
 function closePlayer() {
     document.getElementById('player-overlay').style.display = 'none';
-    if (player) {
-        player.pause();
+    if (dp) {
+        dp.pause();
     }
 }
 
@@ -854,9 +826,8 @@ function render() {
     } else {
         const seriesMap = new Map();
         rows.forEach(f => {
-            if (f.type === 'movie') {
-                groups.push({ type: 'movie', data: f });
-            } else {
+            if (f.type === 'movie') { groups.push({ type: 'movie', data: f }); }
+            else {
                 if (!seriesMap.has(f.series_title)) seriesMap.set(f.series_title, new Map());
                 const series = seriesMap.get(f.series_title);
                 if (!series.has(f.season)) series.set(f.season, []);
@@ -909,10 +880,7 @@ function renderSeriesGroup(group, tbody) {
         <td>—</td>
         <td class="size-cell">${formatSize(group.size)}</td>
     `;
-    tr.onclick = () => {
-        if (expandedGroups.has(groupId)) expandedGroups.delete(groupId); else expandedGroups.add(groupId);
-        render();
-    };
+    tr.onclick = () => { if (expandedGroups.has(groupId)) expandedGroups.delete(groupId); else expandedGroups.add(groupId); render(); };
     tbody.appendChild(tr);
 
     if (expandedGroups.has(groupId)) {
