@@ -11,6 +11,7 @@ arch:
 map:
   - media:ro
   - data:rw
+init: false
 ports:
   8080/tcp: 8080
 options:
