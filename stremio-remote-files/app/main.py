@@ -18,16 +18,6 @@ from scanner import scan_movies, scan_series
 
 app = FastAPI()
 
-# Redirect root to file browser
-@app.get("/")
-def root():
-    return RedirectResponse(url="/files")
-
-# Redirect /manifest.json to internal manifest
-@app.get("/manifest.json")
-def manifest_redirect():
-    return RedirectResponse(url="/internal/manifest.json")
-
 # Stremio desktop/web clients require permissive CORS
 app.add_middleware(
     CORSMiddleware,
@@ -56,6 +46,17 @@ app.include_router(admin_router)
 # Auth endpoints
 app.include_router(auth_router)
 
-# Serve static media files (replaces Caddy's file_server)
-# Must be mounted last so it doesn't shadow API routes
-app.mount("/", StaticFiles(directory="/media"), name="media")
+# Serve static media files
+# Mounted under /media/ to avoid shadowing API routes
+app.mount("/media", StaticFiles(directory="/media"), name="media")
+
+# Redirect /manifest.json to internal manifest
+@app.get("/manifest.json")
+def manifest_redirect():
+    return RedirectResponse(url="/internal/manifest.json")
+
+# Redirect root to file browser (already covered by admin_router's @router.get("/") if we add it)
+# Or just define it here.
+@app.get("/")
+def root():
+    return RedirectResponse(url="/files")

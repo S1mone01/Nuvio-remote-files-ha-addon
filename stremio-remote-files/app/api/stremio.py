@@ -46,7 +46,14 @@ def build_stream(
 ):
     # Percent-encode each path segment
     safe_path = "/".join(quote(p) for p in path.split("/"))
-    url = f"{base_url}{safe_path.replace('/media', '')}"
+    
+    # Ensure URL points to /media/...
+    # The 'path' stored in DB is typically /media/EXTERNAL_USB/...
+    # If safe_path starts with /media, we just prepend base_url
+    if safe_path.startswith("/media"):
+        url = f"{base_url}{safe_path}"
+    else:
+        url = f"{base_url}/media{safe_path}"
 
     filename = Path(path).name
     res = resolution or ""
