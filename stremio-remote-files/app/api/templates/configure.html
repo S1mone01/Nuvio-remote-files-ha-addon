@@ -77,11 +77,12 @@
 
 <script>
 const path = window.location.pathname;
-const mode = path.startsWith("/external") ? "external" : "internal";
+const mode = path.includes("/external") ? "external" : "internal";
 const isExternal = mode === "external";
 
 const baseInput = document.getElementById("base");
-baseInput.value = window.location.origin;
+const base_path = "{{ base_path(request) }}";
+baseInput.value = window.location.origin + base_path;
 
 if (isExternal) {
     document.getElementById("token-block").style.display = "block";
