@@ -277,6 +277,37 @@
             font-size: 0.82rem;
             white-space: nowrap;
             color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .play-btn {
+            background: var(--accent2);
+            color: white;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+            flex-shrink: 0;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.1);
+            opacity: 0.9;
+        }
+
+        .play-btn svg {
+            fill: white;
+            width: 14px;
+            height: 14px;
+            margin-left: 2px;
         }
 
         .empty-state {
@@ -369,6 +400,37 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
 
+        /* ── Player Modal ── */
+        .player-container {
+            background: #000;
+            width: 95%;
+            max-width: 1200px;
+            height: 85vh;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        }
+
+        .player-header {
+            background: var(--surface);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text);
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+
+        #artplayer {
+            flex: 1;
+            width: 100%;
+        }
+
         .modal-header {
             font-weight: 700;
             font-size: 1.1rem;
@@ -383,7 +445,10 @@
             color: var(--muted);
             font-size: 1.5rem;
             line-height: 1;
+            transition: color 0.2s;
         }
+
+        .modal-close:hover { color: var(--text); }
 
         .modal-body {
             font-size: 0.9rem;
@@ -529,6 +594,17 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="player-overlay" onclick="closePlayer()">
+    <div class="player-container" onclick="event.stopPropagation()">
+        <div class="player-header">
+            <span id="player-title"></span>
+            <span class="modal-close" onclick="closePlayer()">&times;</span>
+        </div>
+        <div id="artplayer"></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────────────
 let allFiles   = [];
@@ -537,6 +613,7 @@ let searchQuery  = '';
 let sortKey      = 'size';
 let sortDir      = 'desc';
 let expandedGroups = new Set();
+let art = null;
 const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -555,6 +632,10 @@ function formatSizeTotal(bytes) {
 
 function basename(path) {
     return path ? path.split('/').pop() : '';
+}
+
+function escapeJs(s) {
+    return s ? s.replace(/'/g, "\\'").replace(/"/g, '\\"') : '';
 }
 
 // ── Actions ─────────────────────────────────────────────────────────
@@ -587,7 +668,7 @@ async function resetDB() {
 }
 
 function showModal() {
-    const link = "http://192.168.1.64:8080/internal/manifest.json";
+    const link = window.location.origin + ingressPath + "/internal/manifest.json";
     document.getElementById('manifest-url').textContent = link;
     document.getElementById('modal-overlay').style.display = 'flex';
 }
@@ -632,6 +713,57 @@ function copyLink() {
             alert("Errore nella copia: seleziona il link manualmente.");
         }
         document.body.removeChild(textArea);
+    }
+}
+
+function playFile(path, title) {
+    const url = ingressPath + path;
+    document.getElementById('player-title').textContent = title;
+    document.getElementById('player-overlay').style.display = 'flex';
+    
+    if (art) {
+        art.destroy();
+    }
+    
+    art = new Artplayer({
+        container: '#artplayer',
+        url: url,
+        title: title,
+        autoplay: true,
+        pip: true,
+        fullscreen: true,
+        fullscreenWeb: true,
+        setting: true,
+        loop: false,
+        playbackRate: true,
+        aspectRatio: true,
+        subtitleOffset: true,
+        miniProgressBar: true,
+        mutex: true,
+        backdrop: true,
+        playsInline: true,
+        autoPlayback: true,
+        airplay: true,
+        theme: '#3fb950',
+        lang: 'it',
+        moreVideoAttr: {
+            crossOrigin: 'anonymous',
+        },
+        icons: {
+            loading: '<div class="spinner"></div>',
+        },
+    });
+
+    // Handle errors
+    art.on('error', (err) => {
+        console.error("ArtPlayer Error:", err);
+    });
+}
+
+function closePlayer() {
+    document.getElementById('player-overlay').style.display = 'none';
+    if (art) {
+        art.pause();
     }
 }
 
@@ -792,7 +924,12 @@ function renderMovieRow(file, tbody) {
             <div class="file-path">${escapeHtml(file.path || '')}</div>
         </td>
         <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
-        <td class="size-cell">${formatSize(file.size)}</td>
+        <td class="size-cell">
+            ${formatSize(file.size)}
+            <button class="play-btn" onclick="playFile('${escapeJs(file.path)}', '${escapeJs(file.title || basename(file.path))}')" title="Riproduci">
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+        </td>
     `;
     tbody.appendChild(tr);
 }
@@ -863,7 +1000,12 @@ function renderSeriesGroup(group, tbody) {
                             </div>
                         </td>
                         <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
-                        <td class="size-cell">${formatSize(ep.size)}</td>
+                        <td class="size-cell">
+                            ${formatSize(ep.size)}
+                            <button class="play-btn" onclick="playFile('${escapeJs(ep.path)}', 'Episodio ${ep.episode}')" title="Riproduci">
+                                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </button>
+                        </td>
                     `;
                     tbody.appendChild(epRow);
                 });
