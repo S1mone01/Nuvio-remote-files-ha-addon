@@ -81,7 +81,7 @@ const mode = path.includes("/external") ? "external" : "internal";
 const isExternal = mode === "external";
 
 const baseInput = document.getElementById("base");
-const base_path = "{{ base_path(request) }}";
+const base_path = "{{ base_path }}";
 baseInput.value = window.location.origin + base_path;
 
 if (isExternal) {

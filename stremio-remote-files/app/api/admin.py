@@ -23,10 +23,9 @@ router = APIRouter()
 
 templates = Jinja2Templates(directory="api/templates")
 
-def get_base_path(request: Request):
-    return request.headers.get("X-Ingress-Path", "")
-
-templates.env.globals["base_path"] = get_base_path
+@templates.context_processor
+def ingress_context(request: Request):
+    return {"base_path": request.headers.get("X-Ingress-Path", "")}
 
 
 # ── File browser UI ───────────────────────────────────────────────────
