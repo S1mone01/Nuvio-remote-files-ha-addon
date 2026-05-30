@@ -10,31 +10,28 @@ export TRUSTED_NETWORKS=$(bashio::config 'trusted_networks')
 MOVIES_DIR=$(bashio::config 'movies_dir_name')
 SERIES_DIR=$(bashio::config 'series_dir_name')
 MEDIA_DISK_NAME=$(bashio::config 'media_disk_name')
-MEDIA_SUBPATH=$(bashio::config 'media_subpath')
+SUBPATH=$(bashio::config 'media_subpath')
+
+# 1. Elenca i dischi disponibili per aiutare l'utente
+bashio::log.info "--- DISCOVERY DISCHI USB ---"
+bashio::log.info "Contenuto di /media:"
+ls -1 /media | while read -r line; do
+    bashio::log.info "  > $line"
+done
+bashio::log.info "---------------------------"
 
 # Construct full media path for check
 MEDIA_PATH="/media/${MEDIA_DISK_NAME}"
-SUBPATH=$(bashio::config 'media_subpath')
 if [ -n "$SUBPATH" ]; then
     MEDIA_PATH="${MEDIA_PATH}/${SUBPATH}"
 fi
 
-# Wait for media disk to be mounted
-bashio::log.info "Verifica montaggio disco: ${MEDIA_PATH}"
-while [ ! -d "${MEDIA_PATH}" ]; do
-    bashio::log.warning "Disco non trovato! In attesa di: ${MEDIA_PATH}"
-    sleep 10
-done
-bashio::log.info "Disco montato correttamente."
-
 # Get Local IP
 INTERNAL_IP=$(hostname -I | awk '{print $1}')
 MEDIA_BASE_URL="http://${INTERNAL_IP}:${PORT}"
-
 bashio::log.info "URL base rilevato: ${MEDIA_BASE_URL}"
 
 # Map paths for the Python application
-# The app logic is: root = Path("/media") / MOVIES_DIR_NAME
 BASE_REL_PATH="${MEDIA_DISK_NAME}"
 if [ -n "$SUBPATH" ]; then
     BASE_REL_PATH="${BASE_REL_PATH}/${SUBPATH}"
@@ -45,26 +42,30 @@ export SERIES_DIR_NAME="${BASE_REL_PATH}/${SERIES_DIR}"
 export MEDIA_BASE_URL_INTERNAL="${MEDIA_BASE_URL}"
 export MEDIA_BASE_URL_EXTERNAL="${MEDIA_BASE_URL}"
 
-# Log envs for debug (except keys)
-bashio::log.info "Movies subfolder: /media/${MOVIES_DIR_NAME}"
-bashio::log.info "Series subfolder: /media/${SERIES_DIR_NAME}"
-
-# Background scanner loop
+# 2. Monitoraggio disco in background (non blocca l'avvio del server)
 (
-    bashio::log.info "Scanner background loop avviato."
-    # Wait for uvicorn to start
-    sleep 15
+    while true; do
+        if [ ! -d "${MEDIA_PATH}" ]; then
+            bashio::log.warning "ATTENZIONE: Percorso media non trovato: ${MEDIA_PATH}"
+            bashio::log.info "Assicurati che 'media_disk_name' sia uno dei nomi elencati sopra."
+        else
+            bashio::log.info "Disco rilevato correttamente in: ${MEDIA_PATH}"
+            break
+        fi
+        sleep 30
+    done
+
+    bashio::log.info "Avvio scanner automatico (ogni ora)..."
+    sleep 15 # Attesa avvio server
     while true; do
         bashio::log.info "Esecuzione scansione programmata..."
         curl -s -X POST "http://localhost:${PORT}/admin/scan" \
              -H "Authorization: Bearer ${ADMIN_SCAN_TOKEN}" > /dev/null
-        
-        bashio::log.info "Scansione completata. Prossima tra 1 ora."
         sleep 3600
     done
 ) &
 
-# Run uvicorn
+# 3. Avvio server FastAPI immediato (per permettere l'accesso a Ingress)
 bashio::log.info "Avvio server FastAPI su porta ${PORT}..."
 cd /app
 exec uvicorn main:app --host 0.0.0.0 --port "${PORT}"
