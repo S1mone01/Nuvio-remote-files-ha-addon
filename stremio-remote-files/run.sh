@@ -31,18 +31,6 @@ fi
 export MOVIES_DIR_NAME="${BASE_REL_PATH}/${MOVIES_DIR}"
 export SERIES_DIR_NAME="${BASE_REL_PATH}/${SERIES_DIR}"
 
-# Background scanner loop
-(
-    bashio::log.info "Avvio scanner automatico (ogni ora)..."
-    sleep 15 # Attesa avvio server
-    while true; do
-        bashio::log.info "Esecuzione scansione programmata..."
-        curl -s -X POST "http://localhost:${PORT}/admin/scan" \
-             -H "Authorization: Bearer ${ADMIN_SCAN_TOKEN}" > /dev/null
-        sleep 3600
-    done
-) &
-
 # Run uvicorn
 bashio::log.info "Avvio server FastAPI su porta ${PORT}..."
 cd /app

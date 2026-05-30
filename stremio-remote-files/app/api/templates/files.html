@@ -71,6 +71,7 @@
         header nav a:hover { color: var(--text); border-color: var(--border); }
         header nav a.active { color: var(--accent); border-color: var(--accent); }
         header nav a.warn:hover { color: var(--warn); border-color: var(--warn); }
+        header nav a.success:hover { color: var(--accent2); border-color: var(--accent2); }
 
         /* ── Stat bar ── */
         .stat-bar {
@@ -434,7 +435,8 @@
     <div class="logo">Remote<span>Files</span></div>
     <nav>
         <a onclick="loadFiles()" class="active">Libreria</a>
-        <a onclick="resetDB()" class="warn">Reset & Scan</a>
+        <a onclick="manualScan()" class="success">Scansiona</a>
+        <a onclick="resetDB()" class="warn">Reset</a>
         <a onclick="showModal()">Link Addon</a>
     </nav>
 </header>
@@ -556,6 +558,23 @@ function basename(path) {
 }
 
 // ── Actions ─────────────────────────────────────────────────────────
+async function manualScan() {
+    const token = prompt("Inserisci l'Admin Scan Token per avviare la scansione:");
+    if (!token) return;
+
+    try {
+        const resp = await fetch(ingressPath + '/admin/scan', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await resp.json();
+        alert("Scansione avviata!");
+        loadFiles();
+    } catch (e) {
+        alert("Errore: " + e.message);
+    }
+}
+
 async function resetDB() {
     if (!confirm("Sei sicuro di voler resettare il database e avviare una nuova scansione?")) return;
     const token = prompt("Inserisci l'Admin Scan Token:");
@@ -567,7 +586,7 @@ async function resetDB() {
             headers: { 'Authorization': 'Bearer ' + token }
         });
         const data = await resp.json();
-        alert("Reset avviato: " + JSON.stringify(data));
+        alert("Reset completato!");
         loadFiles();
     } catch (e) {
         alert("Errore: " + e.message);
