@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Remote Files – Libreria</title>
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;400;600;700&display=swap');
 
@@ -279,6 +280,7 @@
             color: var(--text);
             text-align: right;
             padding-right: 12px !important;
+            width: 140px;
         }
 
         .size-content {
@@ -286,6 +288,7 @@
             align-items: center;
             justify-content: flex-end;
             gap: 8px;
+            width: 100%;
         }
 
         .play-btn {
@@ -431,10 +434,23 @@
             border-bottom: 1px solid var(--border);
         }
 
-        #artplayer {
+        .video-js-wrap {
             flex: 1;
             width: 100%;
+            position: relative;
+            background: #000;
         }
+
+        .video-js {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Video.js Matrix Theme Customization */
+        .vjs-matrix.video-js { color: var(--accent2); }
+        .vjs-matrix .vjs-big-play-button { border-color: var(--accent2); background-color: rgba(0,0,0,0.5); }
+        .vjs-matrix .vjs-play-progress, .vjs-matrix .vjs-volume-level { background-color: var(--accent2); }
+        .vjs-matrix .vjs-control-bar { background-color: rgba(22, 27, 34, 0.95); }
 
         .modal-header {
             font-weight: 700;
@@ -605,11 +621,13 @@
             <span id="player-title"></span>
             <span class="modal-close" onclick="closePlayer()">&times;</span>
         </div>
-        <div id="artplayer"></div>
+        <div class="video-js-wrap">
+            <video id="vjs-player" class="video-js vjs-big-play-centered vjs-matrix" controls preload="auto" playsinline></video>
+        </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
+<script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────────────
 let allFiles   = [];
@@ -618,7 +636,7 @@ let searchQuery  = '';
 let sortKey      = 'size';
 let sortDir      = 'desc';
 let expandedGroups = new Set();
-let art = null;
+let player = null;
 const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -641,6 +659,14 @@ function basename(path) {
 
 function escapeJs(s) {
     return s ? s.replace(/'/g, "\\'").replace(/"/g, '\\"') : '';
+}
+
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 // ── Actions ─────────────────────────────────────────────────────────
@@ -687,7 +713,6 @@ function closeModal() {
 
 function copyLink() {
     const url = document.getElementById('manifest-url').textContent;
-    
     function updateBtn() {
         const btn = document.getElementById('copy-btn');
         btn.textContent = 'Copiato!';
@@ -697,11 +722,9 @@ function copyLink() {
             btn.classList.remove('success');
         }, 2000);
     }
-
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(updateBtn);
     } else {
-        // Fallback for non-HTTPS or older browsers
         const textArea = document.createElement("textarea");
         textArea.value = url;
         textArea.style.position = "fixed";
@@ -715,7 +738,6 @@ function copyLink() {
             updateBtn();
         } catch (err) {
             console.error('Fallback copy failed', err);
-            alert("Errore nella copia: seleziona il link manualmente.");
         }
         document.body.removeChild(textArea);
     }
@@ -726,49 +748,29 @@ function playFile(path, title) {
     document.getElementById('player-title').textContent = title;
     document.getElementById('player-overlay').style.display = 'flex';
     
-    if (art) {
-        art.destroy();
+    if (!player) {
+        player = videojs('vjs-player', {
+            autoplay: true,
+            controls: true,
+            responsive: true,
+            fluid: false,
+            playbackRates: [0.5, 1, 1.25, 1.5, 2],
+            language: 'it',
+            userActions: {
+                hotkeys: true
+            }
+        });
     }
     
-    art = new Artplayer({
-        container: '#artplayer',
-        url: url,
-        title: title,
-        autoplay: true,
-        pip: true,
-        fullscreen: true,
-        fullscreenWeb: true,
-        setting: true,
-        loop: false,
-        playbackRate: true,
-        aspectRatio: true,
-        subtitleOffset: true,
-        miniProgressBar: true,
-        mutex: true,
-        backdrop: true,
-        playsInline: true,
-        autoPlayback: true,
-        airplay: true,
-        theme: '#3fb950',
-        lang: 'it',
-        moreVideoAttr: {
-            crossOrigin: 'anonymous',
-        },
-        icons: {
-            loading: '<div class="spinner"></div>',
-        },
-    });
-
-    // Handle errors
-    art.on('error', (err) => {
-        console.error("ArtPlayer Error:", err);
-    });
+    player.src({ type: 'video/mp4', src: url }); // Note: works for MKV too if browser supports codec
+    player.load();
+    player.play();
 }
 
 function closePlayer() {
     document.getElementById('player-overlay').style.display = 'none';
-    if (art) {
-        art.pause();
+    if (player) {
+        player.pause();
     }
 }
 
@@ -788,8 +790,7 @@ async function loadFiles() {
     } catch (e) {
         document.getElementById('loading').innerHTML =
             `<div style="color:var(--warn);text-align:center;padding:60px">
-                Errore nel caricamento: ${e.message}<br>
-                <small style="color:var(--muted)">Assicurati che il server sia avviato e che la libreria sia stata scansionata.</small>
+                Errore nel caricamento: ${e.message}
             </div>`;
     }
 }
@@ -808,13 +809,9 @@ function updateStats(data) {
 // ── Render ───────────────────────────────────────────────────────────
 function render() {
     let rows = allFiles.slice();
-
-    // Filter by type
     if (activeFilter !== 'all') {
         rows = rows.filter(f => f.type === activeFilter);
     }
-
-    // Search
     if (searchQuery) {
         const q = searchQuery.toLowerCase();
         rows = rows.filter(f =>
@@ -823,8 +820,6 @@ function render() {
             (f.series_title || '').toLowerCase().includes(q)
         );
     }
-
-    // Sort
     rows.sort((a, b) => {
         let av, bv;
         if (sortKey === 'size')       { av = a.size || 0; bv = b.size || 0; }
@@ -833,35 +828,26 @@ function render() {
         else if (sortKey === 'type')  { av = a.type; bv = b.type; }
         else if (sortKey === 'resolution') { av = a.resolution || ''; bv = b.resolution || ''; }
         else { av = 0; bv = 0; }
-
         if (av < bv) return sortDir === 'asc' ? -1 : 1;
         if (av > bv) return sortDir === 'asc' ? 1 : -1;
         return 0;
     });
 
     document.getElementById('loading').style.display = 'none';
-
     const tbody = document.getElementById('file-tbody');
     tbody.innerHTML = '';
 
     if (rows.length === 0) {
         document.getElementById('file-table').style.display = 'none';
         document.getElementById('empty').style.display = 'block';
-        document.getElementById('empty-msg').textContent =
-            searchQuery ? `Nessun risultato per "${searchQuery}"` : 'Nessun file trovato nella libreria.';
-        document.getElementById('count-label').textContent = '';
         return;
     }
 
     document.getElementById('empty').style.display = 'none';
     document.getElementById('file-table').style.display = 'table';
-
-    // Partial-size sum of visible rows
     const visibleBytes = rows.reduce((s, f) => s + (f.size || 0), 0);
-    document.getElementById('count-label').textContent =
-        `${rows.length} file${rows.length !== allFiles.length ? ` (filtrati su ${allFiles.length})` : ''} · ${formatSizeTotal(visibleBytes)}`;
+    document.getElementById('count-label').textContent = `${rows.length} file · ${formatSizeTotal(visibleBytes)}`;
 
-    // Grouping logic for series
     const groups = [];
     if (activeFilter === 'movie') {
         rows.forEach(f => groups.push({ type: 'movie', data: f }));
@@ -877,46 +863,15 @@ function render() {
                 series.get(f.season).push(f);
             }
         });
-
         seriesMap.forEach((seasons, title) => {
             const totalSize = Array.from(seasons.values()).flat().reduce((s, f) => s + (f.size || 0), 0);
-            const totalEps = Array.from(seasons.values()).flat().length;
-            groups.push({
-                type: 'series-group',
-                title: title,
-                size: totalSize,
-                count: totalEps,
-                seasons: seasons
-            });
-        });
-
-        // Re-sort groups if they are mixed
-        groups.sort((a, b) => {
-            let av, bv;
-            const getVal = (x) => {
-                if (x.type === 'movie') {
-                    if (sortKey === 'size') return x.data.size || 0;
-                    if (sortKey === 'title') return (x.data.title || '').toLowerCase();
-                    return (x.data.path || '').toLowerCase();
-                } else {
-                    if (sortKey === 'size') return x.size || 0;
-                    if (sortKey === 'title') return (x.title || '').toLowerCase();
-                    return (x.title || '').toLowerCase();
-                }
-            };
-            av = getVal(a); bv = getVal(b);
-            if (av < bv) return sortDir === 'asc' ? -1 : 1;
-            if (av > bv) return sortDir === 'asc' ? 1 : -1;
-            return 0;
+            groups.push({ type: 'series-group', title: title, size: totalSize, count: Array.from(seasons.values()).flat().length, seasons: seasons });
         });
     }
 
     groups.forEach(group => {
-        if (group.type === 'movie') {
-            renderMovieRow(group.data, tbody);
-        } else {
-            renderSeriesGroup(group, tbody);
-        }
+        if (group.type === 'movie') { renderMovieRow(group.data, tbody); }
+        else { renderSeriesGroup(group, tbody); }
     });
 }
 
@@ -928,7 +883,7 @@ function renderMovieRow(file, tbody) {
             <div class="file-title">${escapeHtml(file.title || basename(file.path))}</div>
             <div class="file-path">${escapeHtml(file.path || '')}</div>
         </td>
-        <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+        <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '—'}</td>
         <td class="size-cell">
             <div class="size-content">
                 ${formatSize(file.size)}
@@ -948,73 +903,41 @@ function renderSeriesGroup(group, tbody) {
     tr.innerHTML = `
         <td><span class="badge series">Serie</span></td>
         <td>
-            <div class="file-title">
-                <span class="toggle-icon">▶</span>
-                ${escapeHtml(group.title)}
-            </div>
+            <div class="file-title"><span class="toggle-icon">▶</span>${escapeHtml(group.title)}</div>
             <div class="file-path">${group.count} episodi</div>
         </td>
         <td>—</td>
         <td class="size-cell">${formatSize(group.size)}</td>
     `;
     tr.onclick = () => {
-        if (expandedGroups.has(groupId)) expandedGroups.delete(groupId);
-        else expandedGroups.add(groupId);
+        if (expandedGroups.has(groupId)) expandedGroups.delete(groupId); else expandedGroups.add(groupId);
         render();
     };
     tbody.appendChild(tr);
 
     if (expandedGroups.has(groupId)) {
-        // Sort seasons
-        const seasons = Array.from(group.seasons.keys()).sort((a, b) => a - b);
-        seasons.forEach(seasonNum => {
+        Array.from(group.seasons.keys()).sort((a, b) => a - b).forEach(seasonNum => {
             const seasonId = `${groupId}-s${seasonNum}`;
             const sRow = document.createElement('tr');
             sRow.className = 'group-row indent' + (expandedGroups.has(seasonId) ? ' expanded' : '');
             const eps = group.seasons.get(seasonNum);
-            const sSize = eps.reduce((s, f) => s + (f.size || 0), 0);
-
             sRow.innerHTML = `
                 <td></td>
-                <td>
-                    <div class="file-title">
-                        <span class="toggle-icon">▶</span>
-                        Stagione ${seasonNum}
-                    </div>
-                    <div class="file-path">${eps.length} episodi</div>
-                </td>
+                <td><div class="file-title"><span class="toggle-icon">▶</span>Stagione ${seasonNum}</div></td>
                 <td>—</td>
-                <td class="size-cell">${formatSize(sSize)}</td>
+                <td class="size-cell">${formatSize(eps.reduce((s, f) => s + (f.size || 0), 0))}</td>
             `;
-            sRow.onclick = (e) => {
-                e.stopPropagation();
-                if (expandedGroups.has(seasonId)) expandedGroups.delete(seasonId);
-                else expandedGroups.add(seasonId);
-                render();
-            };
+            sRow.onclick = (e) => { e.stopPropagation(); if (expandedGroups.has(seasonId)) expandedGroups.delete(seasonId); else expandedGroups.add(seasonId); render(); };
             tbody.appendChild(sRow);
-
             if (expandedGroups.has(seasonId)) {
                 eps.sort((a,b) => (a.episode || 0) - (b.episode || 0)).forEach(ep => {
                     const epRow = document.createElement('tr');
                     epRow.className = 'nested-row visible';
                     epRow.innerHTML = `
                         <td></td>
-                        <td class="indent">
-                            <div style="padding-left: 20px">
-                                <div class="file-title">Episodio ${ep.episode}</div>
-                                <div class="file-path">${escapeHtml(ep.path)}</div>
-                            </div>
-                        </td>
-                        <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
-                        <td class="size-cell">
-                            <div class="size-content">
-                                ${formatSize(ep.size)}
-                                <button class="play-btn" onclick="playFile('${escapeJs(ep.path)}', 'Episodio ${ep.episode}')" title="Riproduci">
-                                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                                </button>
-                            </div>
-                        </td>
+                        <td class="indent"><div style="padding-left: 20px"><div class="file-title">Episodio ${ep.episode}</div><div class="file-path">${escapeHtml(ep.path)}</div></div></td>
+                        <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '—'}</td>
+                        <td class="size-cell"><div class="size-content">${formatSize(ep.size)}<button class="play-btn" onclick="playFile('${escapeJs(ep.path)}', 'Episodio ${ep.episode}')" title="Riproduci"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button></div></td>
                     `;
                     tbody.appendChild(epRow);
                 });
@@ -1023,52 +946,10 @@ function renderSeriesGroup(group, tbody) {
     }
 }
 
-function escapeHtml(s) {
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
-// ── Events ───────────────────────────────────────────────────────────
-document.getElementById('search').addEventListener('input', e => {
-    searchQuery = e.target.value.trim();
-    render();
-});
-
-document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        activeFilter = btn.dataset.filter;
-        render();
-    });
-});
-
-document.getElementById('sort-select').addEventListener('change', e => {
-    const [key, dir] = e.target.value.split('-');
-    sortKey = key;
-    sortDir = dir;
-    render();
-});
-
-document.querySelectorAll('thead th[data-col]').forEach(th => {
-    th.addEventListener('click', () => {
-        const col = th.dataset.col;
-        if (sortKey === col) {
-            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-        } else {
-            sortKey = col;
-            sortDir = 'desc';
-        }
-        document.querySelectorAll('thead th').forEach(t => t.classList.remove('sort-asc','sort-desc'));
-        th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
-        render();
-    });
-});
-
-// ── Boot ─────────────────────────────────────────────────────────────
+document.getElementById('search').addEventListener('input', e => { searchQuery = e.target.value.trim(); render(); });
+document.querySelectorAll('.filter-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.dataset.filter; render(); }); });
+document.getElementById('sort-select').addEventListener('change', e => { const [key, dir] = e.target.value.split('-'); sortKey = key; sortDir = dir; render(); });
+document.querySelectorAll('thead th[data-col]').forEach(th => { th.addEventListener('click', () => { const col = th.dataset.col; if (sortKey === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; } else { sortKey = col; sortDir = 'desc'; } document.querySelectorAll('thead th').forEach(t => t.classList.remove('sort-asc','sort-desc')); th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc'); render(); }); });
 loadFiles();
 </script>
 </body>
