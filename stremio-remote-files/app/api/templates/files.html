@@ -277,7 +277,11 @@
             font-size: 0.82rem;
             white-space: nowrap;
             color: var(--text);
-            display: flex;
+            text-align: right;
+        }
+
+        .size-content {
+            display: inline-flex;
             align-items: center;
             justify-content: flex-end;
             gap: 10px;
@@ -668,7 +672,7 @@ async function resetDB() {
 }
 
 function showModal() {
-    const link = window.location.origin + ingressPath + "/internal/manifest.json";
+    const link = window.location.protocol + "//" + window.location.host + ingressPath + "/internal/manifest.json";
     document.getElementById('manifest-url').textContent = link;
     document.getElementById('modal-overlay').style.display = 'flex';
 }
@@ -925,10 +929,12 @@ function renderMovieRow(file, tbody) {
         </td>
         <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="size-cell">
-            ${formatSize(file.size)}
-            <button class="play-btn" onclick="playFile('${escapeJs(file.path)}', '${escapeJs(file.title || basename(file.path))}')" title="Riproduci">
-                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-            </button>
+            <div class="size-content">
+                ${formatSize(file.size)}
+                <button class="play-btn" onclick="playFile('${escapeJs(file.path)}', '${escapeJs(file.title || basename(file.path))}')" title="Riproduci">
+                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+            </div>
         </td>
     `;
     tbody.appendChild(tr);
@@ -1001,10 +1007,12 @@ function renderSeriesGroup(group, tbody) {
                         </td>
                         <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
                         <td class="size-cell">
-                            ${formatSize(ep.size)}
-                            <button class="play-btn" onclick="playFile('${escapeJs(ep.path)}', 'Episodio ${ep.episode}')" title="Riproduci">
-                                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                            </button>
+                            <div class="size-content">
+                                ${formatSize(ep.size)}
+                                <button class="play-btn" onclick="playFile('${escapeJs(ep.path)}', 'Episodio ${ep.episode}')" title="Riproduci">
+                                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                </button>
+                            </div>
                         </td>
                     `;
                     tbody.appendChild(epRow);
