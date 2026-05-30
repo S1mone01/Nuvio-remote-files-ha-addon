@@ -77,6 +77,7 @@
 
     <button type="button" class="primary" onclick="scan()">Scan Library</button>
     <button type="button" class="danger" onclick="rebuild()">Full Rebuild</button>
+    <button type="button" class="danger" style="background: #991b1b;" onclick="reset()">Reset & Scan</button>
 
     <pre id="output"></pre>
 </div>
@@ -88,6 +89,11 @@ async function scan() {
 
 async function rebuild() {
     if (!confirm("This will clear the database. Continue?")) return;
+    await call("/admin/scan/rebuild");
+}
+
+async function reset() {
+    if (!confirm("This will completely reset the database and start a fresh scan. Continue?")) return;
     await call("/admin/scan/rebuild");
 }
 

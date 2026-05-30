@@ -244,17 +244,13 @@
         .badge.movie  { background: rgba(88,166,255,.15); color: var(--movie-clr); }
         .badge.series { background: rgba(63,185,80,.15);  color: var(--serie-clr); }
 
-        .file-name {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            color: var(--text);
-            word-break: break-all;
-        }
-
         .file-title {
             font-weight: 600;
             color: var(--text);
             margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .file-path {
@@ -310,25 +306,43 @@
             animation: spin .7s linear infinite;
         }
 
-        /* ── Loading skeleton ── */
-        @keyframes shimmer {
-            0%   { background-position: -400px 0; }
-            100% { background-position: 400px 0; }
-        }
-
-        .skeleton {
-            background: linear-gradient(90deg, var(--surface) 25%, var(--border) 50%, var(--surface) 75%);
-            background-size: 800px 100%;
-            animation: shimmer 1.4s infinite;
-            border-radius: 4px;
-            height: 14px;
-        }
-
         /* ── Footer count ── */
         .table-footer {
             padding: 10px 32px;
             font-size: 0.78rem;
             color: var(--muted);
+        }
+
+        /* Group styles */
+        .group-row {
+            cursor: pointer;
+            background: rgba(255,255,255,.02);
+        }
+        .group-row:hover {
+            background: rgba(255,255,255,.05);
+        }
+        .nested-row {
+            background: rgba(0,0,0,.2);
+            display: none;
+        }
+        .nested-row.visible {
+            display: table-row;
+        }
+        .indent {
+            padding-left: 40px !important;
+        }
+        .folder-icon {
+            color: var(--accent);
+            margin-right: 8px;
+        }
+        .toggle-icon {
+            font-size: 0.7rem;
+            transition: transform 0.2s;
+            display: inline-block;
+            width: 12px;
+        }
+        .group-row.expanded .toggle-icon {
+            transform: rotate(90deg);
         }
 
         @media (max-width: 640px) {
@@ -427,6 +441,7 @@ let activeFilter = 'all';
 let searchQuery  = '';
 let sortKey      = 'size';
 let sortDir      = 'desc';
+let expandedGroups = new Set();
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function formatSize(bytes) {
@@ -531,26 +546,153 @@ function render() {
     document.getElementById('count-label').textContent =
         `${rows.length} file${rows.length !== allFiles.length ? ` (filtrati su ${allFiles.length})` : ''} · ${formatSizeTotal(visibleBytes)}`;
 
-    rows.forEach(file => {
-        const tr = document.createElement('tr');
+    // Grouping logic for series
+    const groups = [];
+    if (activeFilter === 'movie') {
+        rows.forEach(f => groups.push({ type: 'movie', data: f }));
+    } else {
+        const seriesMap = new Map();
+        rows.forEach(f => {
+            if (f.type === 'movie') {
+                groups.push({ type: 'movie', data: f });
+            } else {
+                if (!seriesMap.has(f.series_title)) seriesMap.set(f.series_title, new Map());
+                const series = seriesMap.get(f.series_title);
+                if (!series.has(f.season)) series.set(f.season, []);
+                series.get(f.season).push(f);
+            }
+        });
 
-        const typeLabel  = file.type === 'movie' ? 'Film' : 'Serie';
-        const typeClass  = file.type === 'movie' ? 'movie' : 'series';
-        const displayTitle = file.type === 'movie'
-            ? (file.title || basename(file.path))
-            : `${file.series_title || '?'} · S${String(file.season || 0).padStart(2,'0')}E${String(file.episode || 0).padStart(2,'0')}`;
+        seriesMap.forEach((seasons, title) => {
+            const totalSize = Array.from(seasons.values()).flat().reduce((s, f) => s + (f.size || 0), 0);
+            const totalEps = Array.from(seasons.values()).flat().length;
+            groups.push({
+                type: 'series-group',
+                title: title,
+                size: totalSize,
+                count: totalEps,
+                seasons: seasons
+            });
+        });
 
-        tr.innerHTML = `
-            <td><span class="badge ${typeClass}">${typeLabel}</span></td>
-            <td>
-                <div class="file-title">${escapeHtml(displayTitle)}</div>
-                <div class="file-path">${escapeHtml(file.path || '')}</div>
-            </td>
-            <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
-            <td class="size-cell">${formatSize(file.size)}</td>
-        `;
-        tbody.appendChild(tr);
+        // Re-sort groups if they are mixed
+        groups.sort((a, b) => {
+            let av, bv;
+            const getVal = (x) => {
+                if (x.type === 'movie') {
+                    if (sortKey === 'size') return x.data.size || 0;
+                    if (sortKey === 'title') return (x.data.title || '').toLowerCase();
+                    return (x.data.path || '').toLowerCase();
+                } else {
+                    if (sortKey === 'size') return x.size || 0;
+                    if (sortKey === 'title') return (x.title || '').toLowerCase();
+                    return (x.title || '').toLowerCase();
+                }
+            };
+            av = getVal(a); bv = getVal(b);
+            if (av < bv) return sortDir === 'asc' ? -1 : 1;
+            if (av > bv) return sortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    groups.forEach(group => {
+        if (group.type === 'movie') {
+            renderMovieRow(group.data, tbody);
+        } else {
+            renderSeriesGroup(group, tbody);
+        }
     });
+}
+
+function renderMovieRow(file, tbody) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><span class="badge movie">Film</span></td>
+        <td>
+            <div class="file-title">${escapeHtml(file.title || basename(file.path))}</div>
+            <div class="file-path">${escapeHtml(file.path || '')}</div>
+        </td>
+        <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="size-cell">${formatSize(file.size)}</td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function renderSeriesGroup(group, tbody) {
+    const groupId = `series-${group.title.replace(/\s+/g, '-')}`;
+    const tr = document.createElement('tr');
+    tr.className = 'group-row' + (expandedGroups.has(groupId) ? ' expanded' : '');
+    tr.innerHTML = `
+        <td><span class="badge series">Serie</span></td>
+        <td>
+            <div class="file-title">
+                <span class="toggle-icon">▶</span>
+                <span class="folder-icon">📂</span>
+                ${escapeHtml(group.title)}
+            </div>
+            <div class="file-path">${group.count} episodi</div>
+        </td>
+        <td>—</td>
+        <td class="size-cell">${formatSize(group.size)}</td>
+    `;
+    tr.onclick = () => {
+        if (expandedGroups.has(groupId)) expandedGroups.delete(groupId);
+        else expandedGroups.add(groupId);
+        render();
+    };
+    tbody.appendChild(tr);
+
+    if (expandedGroups.has(groupId)) {
+        // Sort seasons
+        const seasons = Array.from(group.seasons.keys()).sort((a, b) => a - b);
+        seasons.forEach(seasonNum => {
+            const seasonId = `${groupId}-s${seasonNum}`;
+            const sRow = document.createElement('tr');
+            sRow.className = 'group-row indent' + (expandedGroups.has(seasonId) ? ' expanded' : '');
+            const eps = group.seasons.get(seasonNum);
+            const sSize = eps.reduce((s, f) => s + (f.size || 0), 0);
+
+            sRow.innerHTML = `
+                <td></td>
+                <td>
+                    <div class="file-title">
+                        <span class="toggle-icon">▶</span>
+                        Stagione ${seasonNum}
+                    </div>
+                    <div class="file-path">${eps.length} episodi</div>
+                </td>
+                <td>—</td>
+                <td class="size-cell">${formatSize(sSize)}</td>
+            `;
+            sRow.onclick = (e) => {
+                e.stopPropagation();
+                if (expandedGroups.has(seasonId)) expandedGroups.delete(seasonId);
+                else expandedGroups.add(seasonId);
+                render();
+            };
+            tbody.appendChild(sRow);
+
+            if (expandedGroups.has(seasonId)) {
+                eps.sort((a,b) => (a.episode || 0) - (b.episode || 0)).forEach(ep => {
+                    const epRow = document.createElement('tr');
+                    epRow.className = 'nested-row visible';
+                    epRow.innerHTML = `
+                        <td></td>
+                        <td class="indent">
+                            <div style="padding-left: 20px">
+                                <div class="file-title">Episodio ${ep.episode}</div>
+                                <div class="file-path">${escapeHtml(ep.path)}</div>
+                            </div>
+                        </td>
+                        <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+                        <td class="size-cell">${formatSize(ep.size)}</td>
+                    `;
+                    tbody.appendChild(epRow);
+                });
+            }
+        });
+    }
 }
 
 function escapeHtml(s) {
