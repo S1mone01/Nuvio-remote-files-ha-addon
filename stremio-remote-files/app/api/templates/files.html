@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Remote Files – Libreria</title>
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;400;600;700&display=swap');
 
@@ -21,7 +20,6 @@
             --muted:     #8b949e;
             --movie-clr: #58a6ff;
             --serie-clr: #3fb950;
-            --plyr-color-main: var(--accent2);
         }
 
         body {
@@ -280,7 +278,7 @@
             white-space: nowrap;
             color: var(--text);
             text-align: left;
-            width: 130px;
+            width: 140px;
         }
 
         .size-content {
@@ -407,46 +405,6 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
 
-        /* ── Player Modal ── */
-        .player-container {
-            background: #000;
-            width: 95%;
-            max-width: 1200px;
-            height: 85vh;
-            border-radius: 12px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid var(--border);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
-        }
-
-        .player-header {
-            background: var(--surface);
-            padding: 12px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: var(--text);
-            font-size: 0.95rem;
-            font-weight: 600;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .plyr-wrap {
-            flex: 1;
-            width: 100%;
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .plyr {
-            width: 100%;
-            height: 100%;
-        }
-
         .modal-header {
             font-weight: 700;
             font-size: 1.1rem;
@@ -486,6 +444,40 @@
             gap: 12px;
             margin-top: 12px;
         }
+
+        /* ── Player Menu ── */
+        .player-menu {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .player-btn {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 14px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .player-btn:hover {
+            border-color: var(--accent);
+            background: rgba(88,166,255,0.05);
+            transform: translateY(-2px);
+        }
+
+        .player-btn .icon { font-size: 1.5rem; }
+        .player-btn .name { font-size: 0.85rem; font-weight: 600; }
+        .player-btn.copy-link { grid-column: span 2; flex-direction: row; justify-content: center; background: var(--surface); }
 
         .copy-btn {
             background: var(--accent);
@@ -586,7 +578,7 @@
             <tr>
                 <th data-col="type">Tipo<span class="sort-icon"></span></th>
                 <th data-col="title">Titolo / Percorso<span class="sort-icon"></span></th>
-                <th data-col="size" class="sort-desc">Dimensione<span class="sort-icon"></span></th>
+                <th data-col="size" class="sort-desc" style="text-align: left">Dimensione<span class="sort-icon"></span></th>
                 <th data-col="resolution">Risoluzione<span class="sort-icon"></span></th>
             </tr>
         </thead>
@@ -594,6 +586,7 @@
     </table>
 </div>
 
+<!-- Modal Link Addon -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
     <div class="modal" onclick="event.stopPropagation()">
         <div class="modal-header">
@@ -610,21 +603,42 @@
     </div>
 </div>
 
+<!-- Modal Player Esterno -->
 <div class="modal-overlay" id="player-overlay" onclick="closePlayer()">
-    <div class="player-container" onclick="event.stopPropagation()">
-        <div class="player-header">
-            <span id="player-title"></span>
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span>Riproduci con...</span>
             <span class="modal-close" onclick="closePlayer()">&times;</span>
         </div>
-        <div class="plyr-wrap">
-            <video id="player" playsinline controls>
-                <source src="" type="video/mp4" />
-            </video>
+        <div class="modal-body">
+            <p id="player-filename" style="margin-bottom:15px; font-weight:600; color:var(--text);"></p>
+            Scegli il player esterno con cui riprodurre il file:
+            <div class="player-menu">
+                <a id="vlc-link" class="player-btn">
+                    <span class="icon">🟠</span>
+                    <span class="name">VLC</span>
+                </a>
+                <a id="nplayer-link" class="player-btn">
+                    <span class="icon">🔵</span>
+                    <span class="name">nPlayer</span>
+                </a>
+                <a id="infuse-link" class="player-btn">
+                    <span class="icon">🎬</span>
+                    <span class="name">Infuse</span>
+                </a>
+                <a id="mxplayer-link" class="player-btn">
+                    <span class="icon">📱</span>
+                    <span class="name">MX Player</span>
+                </a>
+                <div class="player-btn copy-link" onclick="copyStreamLink()">
+                    <span class="icon">🔗</span>
+                    <span class="name" id="copy-stream-text">Copia Link Streaming</span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────────────
 let allFiles   = [];
@@ -633,7 +647,8 @@ let searchQuery  = '';
 let sortKey      = 'size';
 let sortDir      = 'desc';
 let expandedGroups = new Set();
-let player = null;
+let currentStreamUrl = "";
+
 const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -728,55 +743,40 @@ function copyLink() {
 }
 
 function playFile(path, title) {
-    const url = ingressPath + path;
-    document.getElementById('player-title').textContent = title;
+    const url = window.location.protocol + "//" + window.location.host + ingressPath + path;
+    currentStreamUrl = url;
+    
+    document.getElementById('player-filename').textContent = title;
+    
+    // VLC
+    document.getElementById('vlc-link').href = `vlc://${url}`;
+    
+    // nPlayer
+    document.getElementById('nplayer-link').href = `nplayer-${url}`;
+    
+    // Infuse
+    document.getElementById('infuse-link').href = `infuse://x-callback-url/play?url=${encodeURIComponent(url)}`;
+    
+    // MX Player (Android Intent)
+    document.getElementById('mxplayer-link').href = `intent:${url}#Intent;package=com.mxtech.videoplayer.ad;S.title=${encodeURIComponent(title)};end`;
+    
     document.getElementById('player-overlay').style.display = 'flex';
-    
-    if (!player) {
-        player = new Plyr('#player', {
-            autoplay: true,
-            controls: [
-                'play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'
-            ],
-            settings: ['captions', 'quality', 'speed', 'loop', 'audio'],
-            i18n: {
-                play: 'Riproduci',
-                pause: 'Pausa',
-                mute: 'Muto',
-                unmute: 'Attiva audio',
-                settings: 'Impostazioni',
-                captions: 'Sottotitoli',
-                audio: 'Audio',
-                speed: 'Velocità',
-                quality: 'Qualità',
-                loop: 'Ripeti',
-                start: 'Inizio',
-                end: 'Fine',
-                all: 'Tutti',
-                none: 'Nessuno',
-                disabled: 'Disabilitato',
-                enabled: 'Abilitato',
-            }
-        });
-    }
-    
-    player.source = {
-        type: 'video',
-        title: title,
-        sources: [
-            {
-                src: url,
-                type: 'video/mp4',
-            },
-        ],
-    };
-    player.play();
 }
 
 function closePlayer() {
     document.getElementById('player-overlay').style.display = 'none';
-    if (player) {
-        player.pause();
+    document.getElementById('copy-stream-text').textContent = "Copia Link Streaming";
+}
+
+function copyStreamLink() {
+    const url = currentStreamUrl;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+            document.getElementById('copy-stream-text').textContent = "Copiato!";
+            setTimeout(() => { document.getElementById('copy-stream-text').textContent = "Copia Link Streaming"; }, 2000);
+        });
+    } else {
+        alert("Link: " + url);
     }
 }
 
@@ -891,7 +891,7 @@ function renderMovieRow(file, tbody) {
         <td class="size-cell">
             <div class="size-content">
                 ${formatSize(file.size)}
-                <button class="play-btn" onclick="playFile('${escapeJs(file.path)}', '${escapeJs(file.title || basename(file.path))}')" title="Riproduci">
+                <button class="play-btn" onclick="playFile('${escapeJs(file.path)}', '${escapeJs(file.title || basename(file.path))}')" title="Riproduci con player esterno">
                     <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                 </button>
             </div>
@@ -938,7 +938,7 @@ function renderSeriesGroup(group, tbody) {
                     epRow.innerHTML = `
                         <td></td>
                         <td class="indent"><div style="padding-left: 20px"><div class="file-title">Episodio ${ep.episode}</div><div class="file-path">${escapeHtml(ep.path)}</div></div></td>
-                        <td class="size-cell"><div class="size-content">${formatSize(ep.size)}<button class="play-btn" onclick="playFile('${escapeJs(ep.path)}', 'Episodio ${ep.episode}')" title="Riproduci"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button></div></td>
+                        <td class="size-cell"><div class="size-content">${formatSize(ep.size)}<button class="play-btn" onclick="playFile('${escapeJs(ep.path)}', 'Episodio ${ep.episode}')" title="Riproduci con player esterno"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button></div></td>
                         <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '—'}</td>
                     `;
                     tbody.appendChild(epRow);
