@@ -6,6 +6,7 @@ url: "https://github.com/S1mone01/stremio-remote-files-ha-addon"
 arch:
   - amd64
   - aarch64
+  - armhf
   - armv7
 map:
   - media:ro
