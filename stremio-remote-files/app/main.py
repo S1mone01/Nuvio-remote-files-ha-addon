@@ -23,6 +23,11 @@ app = FastAPI()
 def root():
     return RedirectResponse(url="/internal/configure")
 
+# Redirect /manifest.json to internal manifest
+@app.get("/manifest.json")
+def manifest_redirect():
+    return RedirectResponse(url="/internal/manifest.json")
+
 # Stremio desktop/web clients require permissive CORS
 app.add_middleware(
     CORSMiddleware,
