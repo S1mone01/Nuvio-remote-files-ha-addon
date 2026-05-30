@@ -18,10 +18,10 @@ from scanner import scan_movies, scan_series
 
 app = FastAPI()
 
-# Redirect root to library page
+# Redirect root to configure page
 @app.get("/")
 def root():
-    return RedirectResponse(url="/library")
+    return RedirectResponse(url="/internal/configure")
 
 # Redirect /manifest.json to internal manifest
 @app.get("/manifest.json")
@@ -57,5 +57,5 @@ app.include_router(admin_router)
 app.include_router(auth_router)
 
 # Serve static media files (replaces Caddy's file_server)
-# Mounted under /media to avoid shadowing API routes
-app.mount("/media", StaticFiles(directory="/media"), name="media")
+# Must be mounted last so it doesn't shadow API routes
+app.mount("/", StaticFiles(directory="/media"), name="media")
