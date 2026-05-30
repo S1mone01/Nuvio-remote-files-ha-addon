@@ -12,6 +12,10 @@ map:
   - media:ro
   - data:rw
 init: false
+ingress: true
+ingress_port: 8080
+panel_icon: "mdi:movie-play"
+panel_title: "Stremio Remote"
 ports:
   8080/tcp: 8080
 options:
