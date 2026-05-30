@@ -4,6 +4,7 @@ Admin and installation endpoints for the Stremio Remote Files addon.
 This module provides:
 - A lightweight admin UI for triggering library scans
 - An install page for generating Stremio addon install links
+- A file browser UI (/) showing all indexed files with total size
 
 Note: The HTML pages themselves are intentionally unauthenticated.
 All destructive or privileged actions require a valid admin token.
@@ -22,6 +23,83 @@ router = APIRouter()
 
 templates = Jinja2Templates(directory="api/templates")
 
+
+# ── File browser UI ───────────────────────────────────────────────────
+
+@router.get("/files", response_class=HTMLResponse)
+def files_page(request: Request):
+    """Human-friendly file browser: shows all indexed files and total size."""
+    return templates.TemplateResponse(
+        "files.html",
+        {"request": request}
+    )
+
+
+@router.get("/api/files")
+def api_files():
+    """
+    JSON endpoint consumed by the /files UI.
+
+    Returns a flat list of all indexed files, with type, title, path,
+    resolution, size, and (for episodes) season/episode numbers.
+    Also returns aggregate totals for the stat bar.
+    """
+    with sqlite3.connect(DB_PATH) as conn:
+        # ── Movies ──────────────────────────────────────────────────
+        movie_rows = conn.execute(
+            """
+            SELECT m.title, f.path, f.resolution, f.size
+            FROM files f
+            JOIN movies m ON m.imdb_id = f.movie_imdb_id
+            WHERE f.movie_imdb_id IS NOT NULL
+            ORDER BY m.title
+            """
+        ).fetchall()
+
+        # ── Episodes ─────────────────────────────────────────────────
+        ep_rows = conn.execute(
+            """
+            SELECT s.title, e.season, e.episode, f.path, f.resolution, f.size
+            FROM files f
+            JOIN episodes e ON e.id = f.episode_id
+            JOIN series  s ON s.imdb_id = e.series_imdb_id
+            WHERE f.episode_id IS NOT NULL
+            ORDER BY s.title, e.season, e.episode
+            """
+        ).fetchall()
+
+    files = []
+
+    for title, path, resolution, size in movie_rows:
+        files.append({
+            "type":       "movie",
+            "title":      title,
+            "path":       path,
+            "resolution": resolution,
+            "size":       size or 0,
+        })
+
+    for series_title, season, episode, path, resolution, size in ep_rows:
+        files.append({
+            "type":         "series",
+            "series_title": series_title,
+            "season":       season,
+            "episode":      episode,
+            "path":         path,
+            "resolution":   resolution,
+            "size":         size or 0,
+        })
+
+    total_size = sum(f["size"] for f in files)
+
+    return {
+        "files":      files,
+        "total_size": total_size,
+        "count":      len(files),
+    }
+
+
+# ── Admin pages ──────────────────────────────────────────────────────
 
 # These pages are intentionally unauthenticated.
 # All privileged actions are protected by token checks on POST routes.
@@ -82,4 +160,3 @@ def configure_page(request: Request):
         "configure.html",
         {"request": request}
     )
-    
