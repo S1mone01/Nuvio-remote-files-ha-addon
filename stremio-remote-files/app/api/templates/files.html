@@ -342,9 +342,9 @@
 <header>
     <div class="logo">Remote<span>Files</span></div>
     <nav>
-        <a href="{{ base_path }}/files" class="active">Libreria</a>
-        <a href="{{ base_path }}/internal/configure">Installa</a>
-        <a href="{{ base_path }}/admin">Admin</a>
+        <a href="{{ request.headers.get('X-Ingress-Path', '') }}/files" class="active">Libreria</a>
+        <a href="{{ request.headers.get('X-Ingress-Path', '') }}/internal/configure">Installa</a>
+        <a href="{{ request.headers.get('X-Ingress-Path', '') }}/admin">Admin</a>
     </nav>
 </header>
 
@@ -449,7 +449,7 @@ function basename(path) {
 // ── Fetch data ───────────────────────────────────────────────────────
 async function loadFiles() {
     try {
-        const resp = await fetch('{{ base_path }}/api/files');
+        const resp = await fetch('{{ request.headers.get("X-Ingress-Path", "") }}/api/files');
         if (!resp.ok) throw new Error(resp.statusText);
         const data = await resp.json();
         allFiles = data.files || [];
