@@ -1,0 +1,34 @@
+name: "Stremio Remote Files"
+slug: "stremio_remote_files"
+version: "1.0.0"
+description: "Server Stremio locale per HAOS: indicizza e serve i tuoi film e serie da dischi USB."
+url: "https://github.com/S1mone01/stremio-remote-files-ha-addon"
+arch:
+  - amd64
+  - aarch64
+  - armv7
+map:
+  - media:ro
+  - data:rw
+ports:
+  8080/tcp: 8080
+options:
+  port: 8080
+  tmdb_api_key: ""
+  admin_scan_token: "secret_token_123"
+  scan_cron: "0 * * * *"
+  movies_dir_name: "movies"
+  series_dir_name: "series"
+  trusted_networks: "192.168.0.0/16 10.0.0.0/8 172.16.0.0/12"
+  media_disk_name: "EXTERNAL_USB"
+  media_subpath: ""
+schema:
+  port: port
+  tmdb_api_key: str
+  admin_scan_token: str
+  scan_cron: str
+  movies_dir_name: str
+  series_dir_name: str
+  trusted_networks: str
+  media_disk_name: str
+  media_subpath: str?
