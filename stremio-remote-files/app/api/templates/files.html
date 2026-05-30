@@ -65,10 +65,12 @@
             border-radius: 6px;
             border: 1px solid transparent;
             transition: all .18s;
+            cursor: pointer;
         }
 
         header nav a:hover { color: var(--text); border-color: var(--border); }
         header nav a.active { color: var(--accent); border-color: var(--accent); }
+        header nav a.warn:hover { color: var(--warn); border-color: var(--warn); }
 
         /* ── Stat bar ── */
         .stat-bar {
@@ -331,10 +333,6 @@
         .indent {
             padding-left: 40px !important;
         }
-        .folder-icon {
-            color: var(--accent);
-            margin-right: 8px;
-        }
         .toggle-icon {
             font-size: 0.7rem;
             transition: transform 0.2s;
@@ -356,9 +354,9 @@
 <header>
     <div class="logo">Remote<span>Files</span></div>
     <nav>
-        <a href="{{ request.headers.get('X-Ingress-Path', '') }}/files" class="active">Libreria</a>
-        <a href="{{ request.headers.get('X-Ingress-Path', '') }}/internal/configure">Installa</a>
-        <a href="{{ request.headers.get('X-Ingress-Path', '') }}/admin">Admin</a>
+        <a onclick="loadFiles()" class="active">Libreria</a>
+        <a onclick="resetDB()" class="warn">Reset & Scan</a>
+        <a onclick="showLink()">Link Addon</a>
     </nav>
 </header>
 
@@ -442,6 +440,7 @@ let searchQuery  = '';
 let sortKey      = 'size';
 let sortDir      = 'desc';
 let expandedGroups = new Set();
+const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function formatSize(bytes) {
@@ -461,10 +460,38 @@ function basename(path) {
     return path ? path.split('/').pop() : '';
 }
 
+// ── Actions ─────────────────────────────────────────────────────────
+async function resetDB() {
+    if (!confirm("Sei sicuro di voler resettare il database e avviare una nuova scansione?")) return;
+    const token = prompt("Inserisci l'Admin Scan Token:");
+    if (!token) return;
+
+    try {
+        const resp = await fetch(ingressPath + '/admin/scan/rebuild', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await resp.json();
+        alert("Reset avviato: " + JSON.stringify(data));
+        loadFiles();
+    } catch (e) {
+        alert("Errore: " + e.message);
+    }
+}
+
+function showLink() {
+    const link = window.location.origin + ingressPath + "/internal/manifest.json";
+    alert("Stremio Manifest URL:\n\n" + link);
+}
+
 // ── Fetch data ───────────────────────────────────────────────────────
 async function loadFiles() {
+    document.getElementById('loading').style.display = 'flex';
+    document.getElementById('file-table').style.display = 'none';
+    document.getElementById('empty').style.display = 'none';
+    
     try {
-        const resp = await fetch('{{ request.headers.get("X-Ingress-Path", "") }}/api/files');
+        const resp = await fetch(ingressPath + '/api/files');
         if (!resp.ok) throw new Error(resp.statusText);
         const data = await resp.json();
         allFiles = data.files || [];
@@ -628,7 +655,6 @@ function renderSeriesGroup(group, tbody) {
         <td>
             <div class="file-title">
                 <span class="toggle-icon">▶</span>
-                <span class="folder-icon">📂</span>
                 ${escapeHtml(group.title)}
             </div>
             <div class="file-path">${group.count} episodi</div>
