@@ -343,6 +343,85 @@
             transform: rotate(90deg);
         }
 
+        /* ── Modal ── */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            padding: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .modal-header {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-close {
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+
+        .modal-body {
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+
+        .link-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--accent);
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .copy-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 0.75rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: opacity 0.2s;
+        }
+
+        .copy-btn:hover { opacity: 0.9; }
+        .copy-btn.success { background: var(--accent2); }
+
         @media (max-width: 640px) {
             header, .stat-bar, .toolbar, .table-wrap, .table-footer { padding-left: 16px; padding-right: 16px; }
             .stat-sep { display: none; }
@@ -356,7 +435,7 @@
     <nav>
         <a onclick="loadFiles()" class="active">Libreria</a>
         <a onclick="resetDB()" class="warn">Reset & Scan</a>
-        <a onclick="showLink()">Link Addon</a>
+        <a onclick="showModal()">Link Addon</a>
     </nav>
 </header>
 
@@ -432,6 +511,22 @@
     </table>
 </div>
 
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span>Link Addon Stremio</span>
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            Copia questo link e incollalo nella barra di ricerca di Stremio (Desktop o Web) per installare l'addon.
+            <div class="link-box">
+                <span id="manifest-url"></span>
+                <button class="copy-btn" id="copy-btn" onclick="copyLink()">Copia</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // ── State ──────────────────────────────────────────────────────────
 let allFiles   = [];
@@ -479,9 +574,30 @@ async function resetDB() {
     }
 }
 
-function showLink() {
+function showModal() {
     const link = window.location.origin + ingressPath + "/internal/manifest.json";
-    alert("Stremio Manifest URL:\n\n" + link);
+    document.getElementById('manifest-url').textContent = link;
+    document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('modal-overlay').style.display = 'none';
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copia';
+    btn.classList.remove('success');
+}
+
+function copyLink() {
+    const url = document.getElementById('manifest-url').textContent;
+    navigator.clipboard.writeText(url).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copiato!';
+        btn.classList.add('success');
+        setTimeout(() => {
+            btn.textContent = 'Copia';
+            btn.classList.remove('success');
+        }, 2000);
+    });
 }
 
 // ── Fetch data ───────────────────────────────────────────────────────
