@@ -30,8 +30,8 @@ templates = Jinja2Templates(directory="api/templates")
 def files_page(request: Request):
     """Human-friendly file browser: shows all indexed files and total size."""
     return templates.TemplateResponse(
-        "files.html",
-        {"request": request}
+        request=request,
+        name="files.html"
     )
 
 
@@ -106,8 +106,8 @@ def api_files():
 @router.get("/admin", response_class=HTMLResponse)
 def admin_page(request: Request):
     return templates.TemplateResponse(
-        "admin.html",
-        {"request": request}
+        request=request,
+        name="admin.html"
     )
 
 
@@ -157,6 +157,6 @@ def admin_scan_rebuild(request: Request):
 @router.get("/external/configure", response_class=HTMLResponse)
 def configure_page(request: Request):
     return templates.TemplateResponse(
-        "configure.html",
-        {"request": request}
+        request=request,
+        name="configure.html"
     )
