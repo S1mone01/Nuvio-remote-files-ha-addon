@@ -277,42 +277,6 @@
             font-size: 0.82rem;
             white-space: nowrap;
             color: var(--text);
-            text-align: left;
-            width: 140px;
-        }
-
-        .size-content {
-            display: inline-flex;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 10px;
-        }
-
-        .play-btn {
-            background: var(--accent2);
-            color: white;
-            border: none;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: transform 0.2s, opacity 0.2s;
-            flex-shrink: 0;
-        }
-
-        .play-btn:hover {
-            transform: scale(1.1);
-            opacity: 0.9;
-        }
-
-        .play-btn svg {
-            fill: white;
-            width: 14px;
-            height: 14px;
-            margin-left: 2px;
         }
 
         .empty-state {
@@ -445,40 +409,6 @@
             margin-top: 12px;
         }
 
-        /* ── Player Menu ── */
-        .player-menu {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 20px;
-        }
-
-        .player-btn {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 14px;
-            border-radius: 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-            text-align: center;
-        }
-
-        .player-btn:hover {
-            border-color: var(--accent);
-            background: rgba(88,166,255,0.05);
-            transform: translateY(-2px);
-        }
-
-        .player-btn .icon { font-size: 1.5rem; }
-        .player-btn .name { font-size: 0.85rem; font-weight: 600; }
-        .player-btn.copy-link { grid-column: span 2; flex-direction: row; justify-content: center; background: var(--surface); }
-
         .copy-btn {
             background: var(--accent);
             color: white;
@@ -578,8 +508,8 @@
             <tr>
                 <th data-col="type">Tipo<span class="sort-icon"></span></th>
                 <th data-col="title">Titolo / Percorso<span class="sort-icon"></span></th>
-                <th data-col="size" class="sort-desc" style="text-align: left">Dimensione<span class="sort-icon"></span></th>
                 <th data-col="resolution">Risoluzione<span class="sort-icon"></span></th>
+                <th data-col="size" class="sort-desc">Dimensione<span class="sort-icon"></span></th>
             </tr>
         </thead>
         <tbody id="file-tbody"></tbody>
@@ -603,42 +533,6 @@
     </div>
 </div>
 
-<!-- Modal Player Esterno -->
-<div class="modal-overlay" id="player-overlay" onclick="closePlayer()">
-    <div class="modal" onclick="event.stopPropagation()">
-        <div class="modal-header">
-            <span>Riproduci con...</span>
-            <span class="modal-close" onclick="closePlayer()">&times;</span>
-        </div>
-        <div class="modal-body">
-            <p id="player-filename" style="margin-bottom:15px; font-weight:600; color:var(--text);"></p>
-            Scegli il player esterno con cui riprodurre il file:
-            <div class="player-menu">
-                <a id="vlc-link" class="player-btn">
-                    <span class="icon">🟠</span>
-                    <span class="name">VLC</span>
-                </a>
-                <a id="nplayer-link" class="player-btn">
-                    <span class="icon">🔵</span>
-                    <span class="name">nPlayer</span>
-                </a>
-                <a id="infuse-link" class="player-btn">
-                    <span class="icon">🎬</span>
-                    <span class="name">Infuse</span>
-                </a>
-                <a id="mxplayer-link" class="player-btn">
-                    <span class="icon">📱</span>
-                    <span class="name">MX Player</span>
-                </a>
-                <div class="player-btn copy-link" onclick="copyStreamLink()">
-                    <span class="icon">🔗</span>
-                    <span class="name" id="copy-stream-text">Copia Link Streaming</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
 // ── State ──────────────────────────────────────────────────────────
 let allFiles   = [];
@@ -647,7 +541,6 @@ let searchQuery  = '';
 let sortKey      = 'size';
 let sortDir      = 'desc';
 let expandedGroups = new Set();
-let currentStreamUrl = "";
 
 const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
 
@@ -667,10 +560,6 @@ function formatSizeTotal(bytes) {
 
 function basename(path) {
     return path ? path.split('/').pop() : '';
-}
-
-function escapeJs(s) {
-    return s ? s.replace(/'/g, "\\'").replace(/"/g, '\\"') : '';
 }
 
 function escapeHtml(s) {
@@ -739,44 +628,6 @@ function copyLink() {
         textArea.select();
         try { document.execCommand('copy'); updateBtn(); } catch (err) { console.error('Fallback copy failed', err); }
         document.body.removeChild(textArea);
-    }
-}
-
-function playFile(path, title) {
-    const url = window.location.protocol + "//" + window.location.host + ingressPath + path;
-    currentStreamUrl = url;
-    
-    document.getElementById('player-filename').textContent = title;
-    
-    // VLC
-    document.getElementById('vlc-link').href = `vlc://${url}`;
-    
-    // nPlayer
-    document.getElementById('nplayer-link').href = `nplayer-${url}`;
-    
-    // Infuse
-    document.getElementById('infuse-link').href = `infuse://x-callback-url/play?url=${encodeURIComponent(url)}`;
-    
-    // MX Player (Android Intent)
-    document.getElementById('mxplayer-link').href = `intent:${url}#Intent;package=com.mxtech.videoplayer.ad;S.title=${encodeURIComponent(title)};end`;
-    
-    document.getElementById('player-overlay').style.display = 'flex';
-}
-
-function closePlayer() {
-    document.getElementById('player-overlay').style.display = 'none';
-    document.getElementById('copy-stream-text').textContent = "Copia Link Streaming";
-}
-
-function copyStreamLink() {
-    const url = currentStreamUrl;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(() => {
-            document.getElementById('copy-stream-text').textContent = "Copiato!";
-            setTimeout(() => { document.getElementById('copy-stream-text').textContent = "Copia Link Streaming"; }, 2000);
-        });
-    } else {
-        alert("Link: " + url);
     }
 }
 
@@ -888,15 +739,8 @@ function renderMovieRow(file, tbody) {
             <div class="file-title">${escapeHtml(file.title || basename(file.path))}</div>
             <div class="file-path">${escapeHtml(file.path || '')}</div>
         </td>
-        <td class="size-cell">
-            <div class="size-content">
-                ${formatSize(file.size)}
-                <button class="play-btn" onclick="playFile('${escapeJs(file.path)}', '${escapeJs(file.title || basename(file.path))}')" title="Riproduci con player esterno">
-                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                </button>
-            </div>
-        </td>
         <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '—'}</td>
+        <td class="size-cell">${formatSize(file.size)}</td>
     `;
     tbody.appendChild(tr);
 }
@@ -911,8 +755,8 @@ function renderSeriesGroup(group, tbody) {
             <div class="file-title"><span class="toggle-icon">▶</span>${escapeHtml(group.title)}</div>
             <div class="file-path">${group.count} episodi</div>
         </td>
-        <td class="size-cell">${formatSize(group.size)}</td>
         <td>—</td>
+        <td class="size-cell">${formatSize(group.size)}</td>
     `;
     tr.onclick = () => { if (expandedGroups.has(groupId)) expandedGroups.delete(groupId); else expandedGroups.add(groupId); render(); };
     tbody.appendChild(tr);
@@ -926,8 +770,8 @@ function renderSeriesGroup(group, tbody) {
             sRow.innerHTML = `
                 <td></td>
                 <td><div class="file-title"><span class="toggle-icon">▶</span>Stagione ${seasonNum}</div></td>
-                <td class="size-cell">${formatSize(eps.reduce((s, f) => s + (f.size || 0), 0))}</td>
                 <td>—</td>
+                <td class="size-cell">${formatSize(eps.reduce((s, f) => s + (f.size || 0), 0))}</td>
             `;
             sRow.onclick = (e) => { e.stopPropagation(); if (expandedGroups.has(seasonId)) expandedGroups.delete(seasonId); else expandedGroups.add(seasonId); render(); };
             tbody.appendChild(sRow);
@@ -938,8 +782,8 @@ function renderSeriesGroup(group, tbody) {
                     epRow.innerHTML = `
                         <td></td>
                         <td class="indent"><div style="padding-left: 20px"><div class="file-title">Episodio ${ep.episode}</div><div class="file-path">${escapeHtml(ep.path)}</div></div></td>
-                        <td class="size-cell"><div class="size-content">${formatSize(ep.size)}<button class="play-btn" onclick="playFile('${escapeJs(ep.path)}', 'Episodio ${ep.episode}')" title="Riproduci con player esterno"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button></div></td>
                         <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '—'}</td>
+                        <td class="size-cell">${formatSize(ep.size)}</td>
                     `;
                     tbody.appendChild(epRow);
                 });
