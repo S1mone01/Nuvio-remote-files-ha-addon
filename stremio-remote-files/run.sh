@@ -12,8 +12,12 @@ SERIES_DIR=$(bashio::config 'series_dir_name')
 MEDIA_DISK_NAME=$(bashio::config 'media_disk_name')
 SUBPATH=$(bashio::config 'media_subpath')
 
-# Get Local IP (using hostname -i for BusyBox compatibility)
-INTERNAL_IP=$(hostname -i | awk '{print $1}')
+# Get Local IP
+INTERNAL_IP=$(bashio::network.ip)
+if [ -z "$INTERNAL_IP" ]; then
+    # Fallback to hostname -i if bashio fails
+    INTERNAL_IP=$(hostname -i | awk '{print $1}')
+fi
 MEDIA_BASE_URL="http://${INTERNAL_IP}:${PORT}"
 bashio::log.info "URL base rilevato: ${MEDIA_BASE_URL}"
 
