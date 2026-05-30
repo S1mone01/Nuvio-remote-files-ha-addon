@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import sqlite3
 
+from db.catalog import get_movie_catalog, get_series_catalog
 from scanner import scan_movies, scan_series
 from core.config import DB_PATH
 from core.auth import require_admin_token
@@ -21,6 +22,22 @@ from core.auth import require_admin_token
 router = APIRouter()
 
 templates = Jinja2Templates(directory="api/templates")
+
+
+@router.get("/library", response_class=HTMLResponse)
+def library_page(request: Request):
+    with sqlite3.connect(DB_PATH) as conn:
+        movies = get_movie_catalog(conn)
+        series = get_series_catalog(conn)
+
+    return templates.TemplateResponse(
+        "library.html",
+        {
+            "request": request,
+            "movies": movies,
+            "series": series
+        }
+    )
 
 
 # These pages are intentionally unauthenticated.

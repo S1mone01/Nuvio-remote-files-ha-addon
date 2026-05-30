@@ -18,10 +18,10 @@ from scanner import scan_movies, scan_series
 
 app = FastAPI()
 
-# Redirect root to configure page
+# Redirect root to library page
 @app.get("/")
 def root():
-    return RedirectResponse(url="/internal/configure")
+    return RedirectResponse(url="/library")
 
 # Redirect /manifest.json to internal manifest
 @app.get("/manifest.json")
