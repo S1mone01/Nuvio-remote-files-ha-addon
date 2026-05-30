@@ -15,12 +15,6 @@ DB_PATH = "/data/library.db"
 MEDIA_BASE_URL_INTERNAL = os.getenv("MEDIA_BASE_URL_INTERNAL")
 MEDIA_BASE_URL_EXTERNAL = os.getenv("MEDIA_BASE_URL_EXTERNAL")
 
-# These must be provided at startup; fail fast if missing
-if not MEDIA_BASE_URL_INTERNAL or not MEDIA_BASE_URL_EXTERNAL:
-    raise RuntimeError(
-        "MEDIA_BASE_URL_INTERNAL and MEDIA_BASE_URL_EXTERNAL must be set"
-    )
-
 # Stream provider display names shown in Stremio
 STREAM_PROVIDER_NAME_INTERNAL = os.getenv(
     "STREAM_PROVIDER_NAME_INTERNAL",

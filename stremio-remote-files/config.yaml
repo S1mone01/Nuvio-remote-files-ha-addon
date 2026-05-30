@@ -28,6 +28,7 @@ options:
   trusted_networks: "192.168.0.0/16 10.0.0.0/8 172.16.0.0/12"
   media_disk_name: "EXTERNAL_USB"
   media_subpath: ""
+  media_base_url: ""
 schema:
   port: port
   tmdb_api_key: str
@@ -38,3 +39,4 @@ schema:
   trusted_networks: str
   media_disk_name: str
   media_subpath: str?
+  media_base_url: str?

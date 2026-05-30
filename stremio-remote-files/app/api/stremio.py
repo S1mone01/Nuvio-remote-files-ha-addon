@@ -112,7 +112,9 @@ def stream_movie(imdb_id: str, request: Request):
     if external and not valid_stream_token(request):
         return {"streams": []}
 
-    base_url = MEDIA_BASE_URL_EXTERNAL if external else MEDIA_BASE_URL_INTERNAL
+    base_url = (
+        MEDIA_BASE_URL_EXTERNAL if external else MEDIA_BASE_URL_INTERNAL
+    ) or str(request.base_url).rstrip("/")
     provider_name = STREAM_PROVIDER_NAME_EXTERNAL if external else STREAM_PROVIDER_NAME_INTERNAL
 
     with sqlite3.connect(DB_PATH) as conn:
@@ -166,7 +168,9 @@ def stream_episode(episode_id: str, request: Request):
     except ValueError:
         return {"streams": []}
 
-    base_url = MEDIA_BASE_URL_EXTERNAL if external else MEDIA_BASE_URL_INTERNAL
+    base_url = (
+        MEDIA_BASE_URL_EXTERNAL if external else MEDIA_BASE_URL_INTERNAL
+    ) or str(request.base_url).rstrip("/")
     provider_name = STREAM_PROVIDER_NAME_EXTERNAL if external else STREAM_PROVIDER_NAME_INTERNAL
 
     with sqlite3.connect(DB_PATH) as conn:

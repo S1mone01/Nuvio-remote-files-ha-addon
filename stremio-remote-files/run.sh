@@ -11,15 +11,16 @@ MOVIES_DIR=$(bashio::config 'movies_dir_name')
 SERIES_DIR=$(bashio::config 'series_dir_name')
 MEDIA_DISK_NAME=$(bashio::config 'media_disk_name')
 SUBPATH=$(bashio::config 'media_subpath')
+MEDIA_BASE_URL_CONFIG=$(bashio::config 'media_base_url')
 
-# Get Local IP
-INTERNAL_IP=$(ip route get 1.1.1.1 | awk '/src/ {print $7}')
-if [ -z "$INTERNAL_IP" ]; then
-    # Fallback for systems where awk index might differ or ip route fails
-    INTERNAL_IP=$(hostname -i | awk '{print $1}')
+# Configure Base URL if provided
+if [ -n "$MEDIA_BASE_URL_CONFIG" ] && [ "$MEDIA_BASE_URL_CONFIG" != "null" ]; then
+    export MEDIA_BASE_URL_INTERNAL="${MEDIA_BASE_URL_CONFIG}"
+    export MEDIA_BASE_URL_EXTERNAL="${MEDIA_BASE_URL_CONFIG}"
+    bashio::log.info "URL base configurato: ${MEDIA_BASE_URL_INTERNAL}"
+else
+    bashio::log.info "URL base non configurato, verrà rilevato dinamicamente dalle richieste."
 fi
-MEDIA_BASE_URL="http://${INTERNAL_IP}:${PORT}"
-bashio::log.info "URL base rilevato: ${MEDIA_BASE_URL}"
 
 # Map paths for the Python application
 BASE_REL_PATH="${MEDIA_DISK_NAME}"
@@ -29,8 +30,6 @@ fi
 
 export MOVIES_DIR_NAME="${BASE_REL_PATH}/${MOVIES_DIR}"
 export SERIES_DIR_NAME="${BASE_REL_PATH}/${SERIES_DIR}"
-export MEDIA_BASE_URL_INTERNAL="${MEDIA_BASE_URL}"
-export MEDIA_BASE_URL_EXTERNAL="${MEDIA_BASE_URL}"
 
 # Background scanner loop
 (
