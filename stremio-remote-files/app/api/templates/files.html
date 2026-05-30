@@ -601,7 +601,8 @@ function closeModal() {
 
 function copyLink() {
     const url = document.getElementById('manifest-url').textContent;
-    navigator.clipboard.writeText(url).then(() => {
+    
+    function updateBtn() {
         const btn = document.getElementById('copy-btn');
         btn.textContent = 'Copiato!';
         btn.classList.add('success');
@@ -609,7 +610,29 @@ function copyLink() {
             btn.textContent = 'Copia';
             btn.classList.remove('success');
         }, 2000);
-    });
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(updateBtn);
+    } else {
+        // Fallback for non-HTTPS or older browsers
+        const textArea = document.createElement("textarea");
+        textArea.value = url;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            updateBtn();
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+            alert("Errore nella copia: seleziona il link manualmente.");
+        }
+        document.body.removeChild(textArea);
+    }
 }
 
 // ── Fetch data ───────────────────────────────────────────────────────
