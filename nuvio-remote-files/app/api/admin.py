@@ -17,7 +17,7 @@ import sqlite3
 
 from scanner import scan_movies, scan_series
 from scanner.organizer import organize_downloads
-from core.config import DB_PATH, is_disk_online, MEDIA_BASE_URL_INTERNAL
+from core.config import DB_PATH, is_disk_online
 from core.auth import require_admin_token
 
 router = APIRouter()
@@ -33,10 +33,7 @@ def files_page(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="files.html",
-        context={
-            "disk_online": is_disk_online(),
-            "media_base_url": MEDIA_BASE_URL_INTERNAL
-        }
+        context={"disk_online": is_disk_online()}
     )
 
 

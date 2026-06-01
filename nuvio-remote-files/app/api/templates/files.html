@@ -328,39 +328,6 @@
             color: var(--text);
         }
 
-        /* ── Play Button ── */
-        .play-btn {
-            background: var(--accent2);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
-            flex-shrink: 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-        .play-btn:hover {
-            transform: scale(1.1);
-            background: #4cd964;
-        }
-        .play-btn svg {
-            width: 18px;
-            height: 18px;
-            margin-left: 2px;
-        }
-
-        .file-title-wrap {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex: 1;
-        }
-
         .empty-state {
             text-align: center;
             padding: 80px 20px;
@@ -813,7 +780,6 @@ let sortDir      = 'desc';
 let expandedGroups = new Set();
 
 const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
-const configuredBaseUrl = "{{ media_base_url if media_base_url else '' }}";
 
 // ── Custom Alert ───────────────────────────────────────────────────
 function showAlert(message, title = "Notifica") {
@@ -1011,49 +977,6 @@ async function submitRename() {
     }
 }
 
-// ── Play VLC ────────────────────────────────────────────────────────
-function playVlc(path) {
-    // Percent-encode each path segment
-    const safePath = path.split('/').map(p => encodeURIComponent(p)).join('/');
-    
-    let fullUrl;
-    if (configuredBaseUrl) {
-        // Use the manually configured base URL (ideal for VLC/external players)
-        fullUrl = configuredBaseUrl.replace(/\/$/, '') + '/' + safePath.replace(/^\//, '');
-    } else {
-        // Fallback to dynamic URL (might fail on Home Assistant Ingress due to authentication)
-        let baseUrl = window.location.origin + ingressPath;
-        fullUrl = baseUrl.replace(/\/$/, '') + '/' + safePath.replace(/^\//, '');
-        
-        if (ingressPath) {
-            console.warn("VLC playback might fail via Ingress due to authentication. Configure 'media_base_url' in the addon options for better results.");
-        }
-    }
-    
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    let vlcUrl;
-    if (isIOS) {
-        vlcUrl = `vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(fullUrl)}`;
-    } else {
-        vlcUrl = `vlc://${fullUrl}`;
-    }
-    
-    console.log("Opening VLC with URL:", vlcUrl);
-    
-    // Check if we are on Ingress and it's the first time
-    if (ingressPath && !configuredBaseUrl && !localStorage.getItem('vlc_ingress_warned')) {
-        showAlert("Stai usando l'accesso tramite Home Assistant Ingress. Se VLC non riesce a caricare il video, configura l'opzione 'media_base_url' con l'IP locale (es. http://192.168.1.10:8080) nelle impostazioni dell'addon.", "Info Riproduzione");
-        localStorage.setItem('vlc_ingress_warned', 'true');
-    }
-
-    const a = document.createElement('a');
-    a.href = vlcUrl;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => document.body.removeChild(a), 100);
-}
-
 // ── Fetch data ───────────────────────────────────────────────────────
 async function loadFiles() {
     document.getElementById('loading').style.display = 'flex';
@@ -1223,23 +1146,12 @@ function renderMovieRow(file, tbody) {
     tr.innerHTML = `
         <td><span class="badge movie">Film</span></td>
         <td>
-            <div class="file-title-wrap">
-                <button class="play-btn" title="Riproduci con VLC">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                </button>
-                <div>
-                    <div class="file-title">${escapeHtml(file.title || basename(file.path))}</div>
-                    <div class="file-path">${escapeHtml(file.path || '')}</div>
-                </div>
-            </div>
+            <div class="file-title">${escapeHtml(file.title || basename(file.path))}</div>
+            <div class="file-path">${escapeHtml(file.path || '')}</div>
         </td>
         <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '—'}</td>
         <td class="size-cell">${formatSize(file.size)}</td>
     `;
-    tr.querySelector('.play-btn').onclick = (e) => {
-        e.stopPropagation();
-        playVlc(file.path);
-    };
     tbody.appendChild(tr);
 }
 
@@ -1280,24 +1192,10 @@ function renderSeriesGroup(group, tbody) {
                     epRow.className = 'nested-row visible';
                     epRow.innerHTML = `
                         <td></td>
-                        <td class="indent">
-                            <div style="padding-left: 20px" class="file-title-wrap">
-                                <button class="play-btn" title="Riproduci con VLC">
-                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                                </button>
-                                <div>
-                                    <div class="file-title">Episodio ${ep.episode}</div>
-                                    <div class="file-path">${escapeHtml(ep.path)}</div>
-                                </div>
-                            </div>
-                        </td>
+                        <td class="indent"><div style="padding-left: 20px"><div class="file-title">Episodio ${ep.episode}</div><div class="file-path">${escapeHtml(ep.path)}</div></div></td>
                         <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '—'}</td>
                         <td class="size-cell">${formatSize(ep.size)}</td>
                     `;
-                    epRow.querySelector('.play-btn').onclick = (e) => {
-                        e.stopPropagation();
-                        playVlc(ep.path);
-                    };
                     tbody.appendChild(epRow);
                 });
             }
