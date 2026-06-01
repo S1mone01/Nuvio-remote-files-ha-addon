@@ -572,6 +572,7 @@
         <a id="nav-downloads" onclick="showTab('downloads')">Download</a>
         <a onclick="manualScan()" class="success">Scansiona</a>
         <a onclick="resetDB()" class="warn">Reset</a>
+        <a onclick="showDebugModal()">Debug</a>
         <a onclick="showModal()">Link Addon</a>
     </nav>
 </header>
@@ -654,7 +655,7 @@
     <div class="toolbar">
         <div style="font-weight: 600; font-size: 1.1rem;">File in Download</div>
         <div style="color: var(--muted); font-size: 0.85rem; margin-left: 12px; flex: 1;">I file qui sotto non sono stati ancora spostati nella libreria.</div>
-        <button class="copy-btn success" onclick="organizeAllDownloads()" style="padding: 8px 16px;">Organizza Tutto</button>
+        <button class="copy-btn success" onclick="organizeAllDownloads()" style="padding: 8px 16px;">Identifica Tutto</button>
     </div>
     
     <div class="table-wrap">
@@ -769,7 +770,36 @@
     </div>
 </div>
 
+<!-- Debug Modal -->
+<div class="modal-overlay" id="debug-modal-overlay" onclick="closeDebugModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span>Debug Strumento di Parsing</span>
+            <span class="modal-close" onclick="closeDebugModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text);">Inserisci Nome File da Testare</label>
+                <textarea id="debug-filename" placeholder="S01E01 Titolo (2024) 1080p..." style="width: 100%; height: 80px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 10px; outline: none; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; resize: none;"></textarea>
+            </div>
+            
+            <button class="copy-btn" onclick="testDebugParse()" style="width: 100%; margin-bottom: 20px;">Testa Parsing</button>
+
+            <div id="debug-results" style="display: none;">
+                <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; color: var(--accent);">Risultato Organizzatore (Identificazione)</div>
+                <div id="organizer-output" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; margin-bottom: 16px; border: 1px solid var(--border);">
+                </div>
+
+                <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; color: var(--accent2);">Risultato Stremio (Riconoscimento Episode)</div>
+                <div id="stremio-output" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; border: 1px solid var(--border);">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+// ... (keep existing state)
 // ── State ──────────────────────────────────────────────────────────
 let allFiles   = [];
 let downloads  = [];
@@ -910,11 +940,65 @@ function closeModal() {
     btn.classList.remove('success');
 }
 
+function showDebugModal() {
+    document.getElementById('debug-modal-overlay').style.display = 'flex';
+}
+
+function closeDebugModal() {
+    document.getElementById('debug-modal-overlay').style.display = 'none';
+    document.getElementById('debug-results').style.display = 'none';
+    document.getElementById('debug-filename').value = '';
+}
+
+async function testDebugParse() {
+    const filename = document.getElementById('debug-filename').value.trim();
+    if (!filename) return;
+    
+    try {
+        const resp = await fetch(ingressPath + '/admin/debug/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename })
+        });
+        const data = await resp.json();
+        
+        if (data.status === 'ok') {
+            document.getElementById('debug-results').style.display = 'block';
+            
+            // Organizer Output
+            const org = data.organizer;
+            let orgHtml = `<strong>Tipo:</strong> ${org.is_series ? 'Serie TV' : 'Film'}<br>`;
+            orgHtml += `<strong>Titolo Estratto:</strong> ${org.title}<br>`;
+            if (org.is_series) {
+                orgHtml += `<strong>Stagione:</strong> ${org.season}, <strong>Episodio:</strong> ${org.episode}<br>`;
+            } else {
+                orgHtml += `<strong>Anno:</strong> ${org.year || 'N/D'}<br>`;
+            }
+            orgHtml += `<strong>Tag:</strong> ${org.tags || 'Nessuno'}<br>`;
+            orgHtml += `<strong>TMDB:</strong> ${org.tmdb} ${org.tmdb_title ? '('+org.tmdb_title+')' : ''}`;
+            document.getElementById('organizer-output').innerHTML = orgHtml;
+            
+            // Stremio Output
+            const str = data.stremio;
+            let strHtml = `<strong>Compatibile Stremio:</strong> ${str.compatible ? '<span style="color:var(--accent2)">SÌ</span>' : '<span style="color:var(--warn)">NO</span>'}<br>`;
+            if (str.compatible && str.parsed) {
+                strHtml += `<strong>Dati Rilevati:</strong> S${str.parsed[0]}E${str.parsed[1]}<br>`;
+            }
+            strHtml += `<strong>Note:</strong> ${str.note}`;
+            document.getElementById('stremio-output').innerHTML = strHtml;
+        } else {
+            showAlert("Errore durante il test: " + data.message);
+        }
+    } catch (e) {
+        showAlert("Errore di connessione: " + e.message);
+    }
+}
+
 async function organizeAllDownloads() {
     try {
         const resp = await fetch(ingressPath + '/admin/downloads/organize', { method: 'POST' });
         const data = await resp.json();
-        showAlert("Organizzazione completata!");
+        showAlert("Identificazione completata!");
         loadDownloads();
     } catch (e) {
         showAlert("Errore: " + e.message, "Errore");

@@ -31,7 +31,25 @@ VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".wmv"}
 EPISODE_PATTERN = re.compile(r"S(?P<season>\d{1,2})E(?P<episode>\d{1,2})", re.IGNORECASE)
 ALT_EPISODE_PATTERN = re.compile(r"(?P<season>\d{1,2})x(?P<episode>\d{1,2})", re.IGNORECASE)
 YEAR_PATTERN = re.compile(r"(?P<year>19\d{2}|20\d{2})")
-RESOLUTION_PATTERN = re.compile(r"(?P<res>2160p|1080p|720p|480p|576p|4K|2K|UHD|HD)", re.IGNORECASE)
+
+# Comprehensive Tags Pattern (Languages removed as per user request)
+TAGS_LIST = [
+    # Sources
+    "CAM", "HDCAM", "TS", "HDTS", "TC", "PPV", "TVRip", "SATRip", "DSRip", "DVRip", "HDTV", "PDTV",
+    "WEBRip", "WEB-DL", "WEBCap", "DVDRip", "DVD5", "DVD9", "DVDRemux", "BDRip", "BRRip", "BluRay",
+    "BDRemux", "UHD BluRay", "UHD Remux", "Remux", "WEB Remux",
+    # Resolutions
+    "480p", "576p", "720p", "1080p", "1440p", "2160p", "4320p", "4K", "8K", "UHD", "HD",
+    # Codecs
+    "XviD", "DivX", "x264", "H\.264", "AVC", "x265", "H\.265", "HEVC", "AV1",
+    # HDR
+    "HDR10", "HDR10\+", "Dolby Vision", "DV", "HLG",
+    # Audio
+    "AAC", "AC3", "Dolby Digital", "E-AC3", "DTS", "DTS-HD MA", "Dolby TrueHD", "Dolby Atmos"
+]
+
+# Create a single pattern to find all tags
+TAGS_PATTERN = re.compile(r"\b(" + "|".join(TAGS_LIST) + r")\b", re.IGNORECASE)
 
 
 def clean_name(name: str) -> str:
@@ -42,16 +60,19 @@ def clean_name(name: str) -> str:
 def parse_filename(filename: str):
     """
     Parse a messy filename to extract title and metadata.
-    Returns (is_series, title, year, season, episode, resolution)
+    Returns (is_series, title, year, season, episode, tags_string)
     """
     stem = Path(filename).stem
     
-    # Try to find resolution
-    res_match = RESOLUTION_PATTERN.search(stem)
-    resolution = res_match.group("res").lower() if res_match else None
-    if resolution == "uhd": resolution = "2160p"
-    if resolution == "hd": resolution = "1080p"
-    if resolution == "4k": resolution = "2160p"
+    # Find all tags
+    found_tags = []
+    # Using finditer to preserve order and avoid duplicates
+    for match in TAGS_PATTERN.finditer(stem):
+        tag = match.group(0).upper()
+        if tag not in found_tags:
+            found_tags.append(tag)
+    
+    tags_string = " ".join(found_tags) if found_tags else None
 
     # Try to find series pattern
     ep_match = EPISODE_PATTERN.search(stem) or ALT_EPISODE_PATTERN.search(stem)
@@ -67,23 +88,23 @@ def parse_filename(filename: str):
         if title_before:
             title = clean_name(title_before)
         else:
-            # If nothing before, use everything after up to the resolution or year
-            # We can simplify by taking title_after and cleaning it from common tags
             potential_title = title_after
+            # Find the position of the first tag or year to truncate the title
+            first_meta_pos = len(potential_title)
             
-            # Remove resolution from title if present
-            res_match_in_after = RESOLUTION_PATTERN.search(potential_title)
-            if res_match_in_after:
-                potential_title = potential_title[:res_match_in_after.start()].strip(" .-_")
+            # Check for tags
+            for match in TAGS_PATTERN.finditer(potential_title):
+                if match.start() < first_meta_pos:
+                    first_meta_pos = match.start()
             
-            # Remove year from title if present
-            year_match_in_after = YEAR_PATTERN.search(potential_title)
-            if year_match_in_after:
-                potential_title = potential_title[:year_match_in_after.start()].strip(" .-_")
-            
-            title = clean_name(potential_title)
+            # Check for year
+            year_match = YEAR_PATTERN.search(potential_title)
+            if year_match and year_match.start() < first_meta_pos:
+                first_meta_pos = year_match.start()
+                
+            title = clean_name(potential_title[:first_meta_pos])
         
-        return True, title, None, season, episode, resolution
+        return True, title, None, season, episode, tags_string
 
     # Try to find year pattern (likely a movie)
     year_match = YEAR_PATTERN.search(stem)
@@ -91,14 +112,18 @@ def parse_filename(filename: str):
         year = int(year_match.group("year"))
         title_raw = stem[:year_match.start()].strip(" .-_")
         title = clean_name(title_raw)
-        return False, title, year, None, None, resolution
+        return False, title, year, None, None, tags_string
 
-    # Fallback: assume movie, use everything before resolution or the whole name
+    # Fallback: assume movie
     title_raw = stem
-    if res_match:
-        title_raw = stem[:res_match.start()].strip(" .-_")
+    first_meta_pos = len(stem)
+    for match in TAGS_PATTERN.finditer(stem):
+        if match.start() < first_meta_pos:
+            first_meta_pos = match.start()
     
-    return False, clean_name(title_raw), None, None, None, resolution
+    title = clean_name(stem[:first_meta_pos])
+    
+    return False, title, None, None, None, tags_string
 
 
 def organize_downloads():
@@ -122,7 +147,7 @@ def organize_downloads():
 
         print(f"[ORGANIZE] Processing: {path.name}")
         
-        is_series, title, year, season, episode, resolution = parse_filename(path.name)
+        is_series, title, year, season, episode, tags = parse_filename(path.name)
         
         if is_series:
             # Series logic
@@ -135,11 +160,9 @@ def organize_downloads():
             season_dir = SERIES_ROOT / clean_title / f"Season {season:02d}"
             season_dir.mkdir(parents=True, exist_ok=True)
             
-            # Format: SXXEXX Title [1080p].ext
-            # We don't have the episode title easily here without another API call,
-            # but we can try to get it if we want. For now, let's stick to the requested format.
-            res_tag = f" [{resolution}]" if resolution else ""
-            new_filename = f"S{season:02d}E{episode:02d} {clean_title}{res_tag}{path.suffix}"
+            tag_suffix = f" [{tags}]" if tags else ""
+
+            new_filename = f"S{season:02d}E{episode:02d} {clean_title}{tag_suffix}{path.suffix}"
             dest_path = season_dir / new_filename
             
             try:
@@ -157,10 +180,10 @@ def organize_downloads():
             
             clean_title = meta["title"]
             clean_year = meta["year"]
-            res_tag = f" [{resolution}]" if resolution else ""
+            tag_suffix = f" [{tags}]" if tags else ""
+
             
-            # Format: Movie Title (YYYY) [1080p].ext
-            new_filename = f"{clean_title} ({clean_year}){res_tag}{path.suffix}"
+            new_filename = f"{clean_title} ({clean_year}){tag_suffix}{path.suffix}"
             dest_path = MOVIES_ROOT / new_filename
             
             try:
@@ -176,6 +199,7 @@ def organize_downloads():
 
 def move_file(file_path: Path, is_series: bool, title: str, year: int = None, season: int = None, episode: int = None, resolution: str = None):
     """Move a specific file to its destination based on provided metadata."""
+    # Note: resolution here acts as the 'tags' string from the UI if manually edited
     if is_series:
         meta = lookup_series(title)
         if not meta:
@@ -185,8 +209,8 @@ def move_file(file_path: Path, is_series: bool, title: str, year: int = None, se
         season_dir = SERIES_ROOT / clean_title / f"Season {season:02d}"
         season_dir.mkdir(parents=True, exist_ok=True)
         
-        res_tag = f" [{resolution}]" if resolution else ""
-        new_filename = f"S{season:02d}E{episode:02d} {clean_title}{res_tag}{file_path.suffix}"
+        tag_suffix = f" [{resolution}]" if resolution else ""
+        new_filename = f"S{season:02d}E{episode:02d} {clean_title}{tag_suffix}{file_path.suffix}"
         dest_path = season_dir / new_filename
     else:
         meta = lookup_movie(title, year)
@@ -195,8 +219,8 @@ def move_file(file_path: Path, is_series: bool, title: str, year: int = None, se
         
         clean_title = meta["title"]
         clean_year = meta["year"]
-        res_tag = f" [{resolution}]" if resolution else ""
-        new_filename = f"{clean_title} ({clean_year}){res_tag}{file_path.suffix}"
+        tag_suffix = f" [{resolution}]" if resolution else ""
+        new_filename = f"{clean_title} ({clean_year}){tag_suffix}{file_path.suffix}"
         dest_path = MOVIES_ROOT / new_filename
 
     try:

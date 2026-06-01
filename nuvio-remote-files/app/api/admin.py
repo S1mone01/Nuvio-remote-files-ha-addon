@@ -185,6 +185,57 @@ def admin_downloads_organize(request: Request):
     return {"status": "ok"}
 
 
+@router.post("/admin/debug/parse")
+async def admin_debug_parse(request: Request):
+    """
+    Debug endpoint to test how a filename will be parsed and if it's compatible with Stremio.
+    """
+    from scanner.organizer import parse_filename
+    from scanner.scan_series import parse_episode_filename
+    from metadata.tmdb import lookup_movie, lookup_series
+    
+    data = await request.json()
+    filename = data.get("filename", "")
+    if not filename:
+        return {"status": "error", "message": "No filename provided"}
+    
+    # 1. Test Organizer Parsing (Raw -> Clean)
+    is_series, title, year, season, episode, tags = parse_filename(filename)
+    
+    tmdb_status = "Not checked"
+    clean_meta = None
+    if is_series:
+        clean_meta = lookup_series(title)
+        tmdb_status = "Found" if clean_meta else "Not Found"
+    else:
+        clean_meta = lookup_movie(title, year)
+        tmdb_status = "Found" if clean_meta else "Not Found"
+
+    # 2. Test Scanner/Stremio Compatibility (Clean/Structured -> DB/Stremio)
+    # This checks if the SxEx pattern is found for Stremio matching
+    scanner_result = parse_episode_filename(filename)
+    stremio_compatible = scanner_result is not None
+    
+    return {
+        "status": "ok",
+        "organizer": {
+            "is_series": is_series,
+            "title": title,
+            "year": year,
+            "season": season,
+            "episode": episode,
+            "tags": tags,
+            "tmdb": tmdb_status,
+            "tmdb_title": clean_meta["title"] if clean_meta else None
+        },
+        "stremio": {
+            "compatible": stremio_compatible,
+            "parsed": scanner_result if stremio_compatible else None,
+            "note": "Stremio requires a clear SxEx pattern to match episodes." if is_series else "Movies match by title/year."
+        }
+    }
+
+
 # ── Admin pages ──────────────────────────────────────────────────────
 
 # These pages are intentionally unauthenticated.
