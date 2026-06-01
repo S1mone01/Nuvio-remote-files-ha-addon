@@ -515,10 +515,10 @@
             }
             .status-indicator { margin-left: auto; font-size: 0.65rem; }
 
-            .stat-bar { padding: 16px; gap: 12px; }
-            .stat { min-width: calc(50% - 12px); }
-            .stat-value { font-size: 1.2rem; }
-            .stat-label { font-size: 0.65rem; }
+            .stat-bar { padding: 16px; gap: 8px; display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: flex-start; }
+            .stat { min-width: 0; flex: 1; }
+            .stat-value { font-size: 0.95rem; white-space: nowrap; }
+            .stat-label { font-size: 0.55rem; white-space: nowrap; }
             .stat-sep { display: none; }
 
             .toolbar { padding: 12px 16px; gap: 10px; }
@@ -547,8 +547,9 @@
         }
 
         @media (max-width: 480px) {
-            .stat { min-width: 100%; }
-            .stat-bar { flex-direction: column; align-items: flex-start; }
+            .stat-bar { padding: 12px 8px; gap: 4px; }
+            .stat-value { font-size: 0.85rem; }
+            .stat-label { font-size: 0.5rem; }
             
             /* Hide less important columns on very small screens to avoid horizontal scroll */
             th[data-col="type"], td:first-child:not(.indent) { display: none; }
