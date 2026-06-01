@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Remote Files – Admin</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        label {
+            font-weight: 600;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 6px;
+            margin-bottom: 16px;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 8px 14px;
+            margin-right: 10px;
+            font-weight: 600;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+
+        button.primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        button.danger {
+            background: #dc2626;
+            color: white;
+        }
+
+        pre {
+            background: #f1f5f9;
+            color: #0f172a;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 20px;
+            min-height: 60px;
+            overflow-x: auto;
+            border: 1px solid #e2e8f0;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 10px;
+            padding: 2px 8px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            vertical-align: middle;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-online { background-color: #16a34a; }
+        .status-offline { background-color: #dc2626; }
+        .status-text-online { color: #16a34a; }
+        .status-text-offline { color: #dc2626; }
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Remote Files Admin
+        <div class="status-indicator">
+            <div class="status-dot {% if disk_online %}status-online{% else %}status-offline{% endif %}"></div>
+            <span class="{% if disk_online %}status-text-online{% else %}status-text-offline{% endif %}">
+                {% if disk_online %}online{% else %}offline{% endif %}
+            </span>
+        </div>
+    </h1>
+
+    <label>Admin Scan Token</label>
+    <input id="token" type="password" placeholder="Bearer token" />
+
+    <button type="button" class="primary" onclick="scan()">Scan Library</button>
+    <button type="button" class="danger" onclick="rebuild()">Full Rebuild</button>
+    <button type="button" class="danger" style="background: #991b1b;" onclick="reset()">Reset & Scan</button>
+
+    <pre id="output"></pre>
+</div>
+
+<script>
+async function scan() {
+    await call("/admin/scan");
+}
+
+async function rebuild() {
+    if (!confirm("This will clear the database. Continue?")) return;
+    await call("/admin/scan/rebuild");
+}
+
+async function reset() {
+    if (!confirm("This will completely reset the database and start a fresh scan. Continue?")) return;
+    await call("/admin/scan/rebuild");
+}
+
+async function call(path) {
+    const token = document.getElementById("token").value;
+    const res = await fetch("{{ request.headers.get('X-Ingress-Path', '') }}" + path, {
+        method: "POST",
+        headers: {
+            "Authorization": "Bearer " + token
+        }
+    });
+    const text = await res.text();
+    document.getElementById("output").textContent = text;
+}
+</script>
+</body>
+</html>
