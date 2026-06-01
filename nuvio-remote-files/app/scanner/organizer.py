@@ -30,7 +30,7 @@ VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".wmv"}
 # Regex patterns
 EPISODE_PATTERN = re.compile(r"S(?P<season>\d{1,2})E(?P<episode>\d{1,2})", re.IGNORECASE)
 ALT_EPISODE_PATTERN = re.compile(r"(?P<season>\d{1,2})x(?P<episode>\d{1,2})", re.IGNORECASE)
-YEAR_PATTERN = re.compile(r"(?P<year>19\d{2}|20\d{2})")
+YEAR_PATTERN = re.compile(r"\(?(?P<year>19\d{2}|20\d{2})\)?")
 
 # Comprehensive Tags Pattern (Languages removed as per user request)
 TAGS_LIST = [
@@ -54,7 +54,7 @@ TAGS_PATTERN = re.compile(r"\b(" + "|".join(TAGS_LIST) + r")\b", re.IGNORECASE)
 
 def clean_name(name: str) -> str:
     """Remove dots, underscores and extra spaces from a name."""
-    return name.replace(".", " ").replace("_", " ").strip()
+    return name.replace(".", " ").replace("_", " ").strip(" .-_()[]{}")
 
 
 def parse_filename(filename: str):
