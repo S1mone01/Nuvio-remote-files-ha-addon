@@ -492,9 +492,67 @@
         }
         .btn-rename:hover { background: var(--warn); color: white; }
 
-        @media (max-width: 640px) {
-            header, .stat-bar, .toolbar, .table-wrap, .table-footer { padding-left: 16px; padding-right: 16px; }
+        /* ── Mobile Optimization ── */
+        @media (max-width: 768px) {
+            header {
+                padding: 12px 16px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            header .logo { font-size: 1.1rem; }
+            header nav {
+                width: 100%;
+                justify-content: space-between;
+                order: 3;
+                margin-top: 4px;
+                overflow-x: auto;
+                padding-bottom: 4px;
+            }
+            header nav a {
+                padding: 6px 10px;
+                font-size: 0.75rem;
+                white-space: nowrap;
+            }
+            .status-indicator { margin-left: auto; font-size: 0.65rem; }
+
+            .stat-bar { padding: 16px; gap: 12px; }
+            .stat { min-width: calc(50% - 12px); }
+            .stat-value { font-size: 1.2rem; }
+            .stat-label { font-size: 0.65rem; }
             .stat-sep { display: none; }
+
+            .toolbar { padding: 12px 16px; gap: 10px; }
+            .search-wrap { max-width: none; width: 100%; }
+            .filter-group { width: 100%; justify-content: space-between; }
+            .filter-btn { flex: 1; text-align: center; padding: 8px 4px; font-size: 0.75rem; }
+            .sort-select { width: 100%; font-size: 0.75rem; }
+
+            .table-wrap { padding: 0 8px 32px; }
+            thead th { font-size: 0.65rem; padding: 8px; }
+            tbody td { padding: 8px; }
+            .file-title { font-size: 0.8rem; }
+            .file-path { font-size: 0.65rem; }
+            .res-badge { font-size: 0.65rem; padding: 1px 4px; }
+            .size-cell { font-size: 0.75rem; }
+            .badge { font-size: 0.6rem; padding: 1px 5px; }
+
+            .modal { padding: 20px; width: 95%; margin: 10px; }
+            .modal-header { font-size: 1rem; }
+            .modal-body { font-size: 0.85rem; }
+            .link-box { font-size: 0.7rem; padding: 8px; flex-direction: column; align-items: stretch; }
+            .copy-btn { width: 100%; text-align: center; }
+            
+            #label-year-season { font-size: 0.75rem; }
+            #rename-modal-overlay input { font-size: 0.85rem; padding: 8px; }
+        }
+
+        @media (max-width: 480px) {
+            .stat { min-width: 100%; }
+            .stat-bar { flex-direction: column; align-items: flex-start; }
+            
+            /* Hide less important columns on very small screens to avoid horizontal scroll */
+            th[data-col="type"], td:first-child:not(.indent) { display: none; }
+            th[data-col="resolution"], td:nth-child(3) { display: none; }
         }
     </style>
 </head>
