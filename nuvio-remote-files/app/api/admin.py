@@ -199,69 +199,73 @@ async def admin_debug_parse(request: Request):
     from scanner.organizer import parse_filename
     from scanner.scan_series import parse_episode_filename
     from metadata.tmdb import lookup_movie, lookup_series
-    
-    data = await request.json()
-    filename = data.get("filename", "")
-    if not filename:
-        return {"status": "error", "message": "No filename provided"}
-    
-    # 1. Test Organizer Parsing (Raw -> Clean)
-    is_series, title, year, season, episode, tags = parse_filename(filename)
-    
-    tmdb_status = "Not checked"
-    clean_meta = None
-    final_filename = "N/D"
-    
     from scanner.organizer import smart_lookup_series
     from metadata.tmdb import lookup_episode
-
-    if is_series:
-        clean_meta = smart_lookup_series(title)
-        if clean_meta:
-            tmdb_status = "Found"
-            # Try to get episode title for final name preview
-            ep_meta = lookup_episode(clean_meta["tmdb_id"], season, episode)
-            display_title = ep_meta["title"] if ep_meta and ep_meta.get("title") else clean_meta["title"]
-            tag_suffix = f" [{tags}]" if tags else ""
-            # Simulate extension from input or default to .mkv
-            ext = "".join(Path(filename).suffixes) or ".mkv"
-            final_filename = f"S{season:02d}E{episode:02d} {display_title}{tag_suffix}{ext}"
-        else:
-            tmdb_status = "Not Found"
-    else:
-        clean_meta = lookup_movie(title, year)
-        if clean_meta:
-            tmdb_status = "Found"
-            tag_suffix = f" [{tags}]" if tags else ""
-            ext = "".join(Path(filename).suffixes) or ".mkv"
-            final_filename = f"{clean_meta['title']} ({clean_meta['year']}){tag_suffix}{ext}"
-        else:
-            tmdb_status = "Not Found"
-
-    # 2. Test Scanner/Stremio Compatibility (Clean/Structured -> DB/Stremio)
-    # This checks if the SxEx pattern is found for Stremio matching
-    scanner_result = parse_episode_filename(filename)
-    stremio_compatible = scanner_result is not None
+    import traceback
     
-    return {
-        "status": "ok",
-        "organizer": {
-            "is_series": is_series,
-            "title": title,
-            "year": year,
-            "season": season,
-            "episode": episode,
-            "tags": tags,
-            "tmdb": tmdb_status,
-            "tmdb_title": clean_meta["title"] if clean_meta else None,
-            "final_filename": final_filename
-        },
-        "stremio": {
-            "compatible": stremio_compatible,
-            "parsed": scanner_result if stremio_compatible else None,
-            "note": "Stremio requires a clear SxEx pattern to match episodes." if is_series else "Movies match by title/year."
+    try:
+        data = await request.json()
+        filename = data.get("filename", "")
+        if not filename:
+            return {"status": "error", "message": "No filename provided"}
+        
+        # 1. Test Organizer Parsing (Raw -> Clean)
+        is_series, title, year, season, episode, tags = parse_filename(filename)
+        
+        tmdb_status = "Not checked"
+        clean_meta = None
+        final_filename = "N/D"
+        
+        if is_series:
+            clean_meta = smart_lookup_series(title)
+            if clean_meta:
+                tmdb_status = "Found"
+                # Try to get episode title for final name preview
+                ep_meta = lookup_episode(clean_meta.get("tmdb_id"), season, episode)
+                display_title = ep_meta["title"] if ep_meta and ep_meta.get("title") else clean_meta["title"]
+                tag_suffix = f" [{tags}]" if tags else ""
+                # Simulate extension from input or default to .mkv
+                ext = "".join(Path(filename).suffixes) or ".mkv"
+                final_filename = f"S{season:02d}E{episode:02d} {display_title}{tag_suffix}{ext}"
+            else:
+                tmdb_status = "Not Found"
+        else:
+            clean_meta = lookup_movie(title, year)
+            if clean_meta:
+                tmdb_status = "Found"
+                tag_suffix = f" [{tags}]" if tags else ""
+                ext = "".join(Path(filename).suffixes) or ".mkv"
+                final_filename = f"{clean_meta['title']} ({clean_meta['year']}){tag_suffix}{ext}"
+            else:
+                tmdb_status = "Not Found"
+
+        # 2. Test Scanner/Stremio Compatibility (Clean/Structured -> DB/Stremio)
+        # This checks if the SxEx pattern is found for Stremio matching
+        scanner_result = parse_episode_filename(filename)
+        stremio_compatible = scanner_result is not None
+        
+        return {
+            "status": "ok",
+            "organizer": {
+                "is_series": is_series,
+                "title": title,
+                "year": year,
+                "season": season,
+                "episode": episode,
+                "tags": tags,
+                "tmdb": tmdb_status,
+                "tmdb_title": clean_meta["title"] if clean_meta else None,
+                "final_filename": final_filename
+            },
+            "stremio": {
+                "compatible": stremio_compatible,
+                "parsed": scanner_result if stremio_compatible else None,
+                "note": "Stremio requires a clear SxEx pattern to match episodes." if is_series else "Movies match by title/year."
+            }
         }
-    }
+    except Exception as e:
+        print(f"[ERROR] Debug parse crash: {traceback.format_exc()}")
+        return {"status": "error", "message": f"Errore interno del server: {str(e)}"}
 
 
 # ── Admin pages ──────────────────────────────────────────────────────
