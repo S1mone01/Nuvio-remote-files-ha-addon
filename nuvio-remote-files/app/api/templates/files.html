@@ -328,6 +328,39 @@
             color: var(--text);
         }
 
+        /* ── Play Button ── */
+        .play-btn {
+            background: var(--accent2);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .play-btn:hover {
+            transform: scale(1.1);
+            background: #4cd964;
+        }
+        .play-btn svg {
+            width: 18px;
+            height: 18px;
+            margin-left: 2px;
+        }
+
+        .file-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
         .empty-state {
             text-align: center;
             padding: 80px 20px;
@@ -977,6 +1010,21 @@ async function submitRename() {
     }
 }
 
+// ── Play VLC ────────────────────────────────────────────────────────
+function playVlc(path) {
+    // Percent-encode each path segment
+    const safePath = path.split('/').map(p => encodeURIComponent(p)).join('/');
+    const url = window.location.origin + ingressPath + safePath;
+    
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const vlcUrl = isIOS 
+        ? `vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(url)}`
+        : `vlc://${url}`;
+    
+    console.log("Opening VLC with URL:", vlcUrl);
+    window.location.href = vlcUrl;
+}
+
 // ── Fetch data ───────────────────────────────────────────────────────
 async function loadFiles() {
     document.getElementById('loading').style.display = 'flex';
@@ -1146,8 +1194,15 @@ function renderMovieRow(file, tbody) {
     tr.innerHTML = `
         <td><span class="badge movie">Film</span></td>
         <td>
-            <div class="file-title">${escapeHtml(file.title || basename(file.path))}</div>
-            <div class="file-path">${escapeHtml(file.path || '')}</div>
+            <div class="file-title-wrap">
+                <button class="play-btn" onclick="playVlc('${file.path.replace(/'/g, "\\'")}')" title="Riproduci con VLC">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <div>
+                    <div class="file-title">${escapeHtml(file.title || basename(file.path))}</div>
+                    <div class="file-path">${escapeHtml(file.path || '')}</div>
+                </div>
+            </div>
         </td>
         <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '—'}</td>
         <td class="size-cell">${formatSize(file.size)}</td>
@@ -1192,7 +1247,17 @@ function renderSeriesGroup(group, tbody) {
                     epRow.className = 'nested-row visible';
                     epRow.innerHTML = `
                         <td></td>
-                        <td class="indent"><div style="padding-left: 20px"><div class="file-title">Episodio ${ep.episode}</div><div class="file-path">${escapeHtml(ep.path)}</div></div></td>
+                        <td class="indent">
+                            <div style="padding-left: 20px" class="file-title-wrap">
+                                <button class="play-btn" onclick="playVlc('${ep.path.replace(/'/g, "\\'")}')" title="Riproduci con VLC">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                </button>
+                                <div>
+                                    <div class="file-title">Episodio ${ep.episode}</div>
+                                    <div class="file-path">${escapeHtml(ep.path)}</div>
+                                </div>
+                            </div>
+                        </td>
                         <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '—'}</td>
                         <td class="size-cell">${formatSize(ep.size)}</td>
                     `;
