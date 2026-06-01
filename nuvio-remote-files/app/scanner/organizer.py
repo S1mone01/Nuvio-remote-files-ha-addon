@@ -155,6 +155,43 @@ def organize_downloads():
     print("[ORGANIZE] Organization complete.")
 
 
+def move_file(file_path: Path, is_series: bool, title: str, year: int = None, season: int = None, episode: int = None, resolution: str = None):
+    """Move a specific file to its destination based on provided metadata."""
+    if is_series:
+        meta = lookup_series(title)
+        if not meta:
+            return False, f"Series not found: {title}"
+        
+        clean_title = meta["title"]
+        season_dir = SERIES_ROOT / clean_title / f"Season {season:02d}"
+        season_dir.mkdir(parents=True, exist_ok=True)
+        
+        res_tag = f" [{resolution}]" if resolution else ""
+        new_filename = f"S{season:02d}E{episode:02d} {clean_title}{res_tag}{file_path.suffix}"
+        dest_path = season_dir / new_filename
+    else:
+        meta = lookup_movie(title, year)
+        if not meta:
+            return False, f"Movie not found: {title} ({year})"
+        
+        clean_title = meta["title"]
+        clean_year = meta["year"]
+        res_tag = f" [{resolution}]" if resolution else ""
+        new_filename = f"{clean_title} ({clean_year}){res_tag}{file_path.suffix}"
+        dest_path = MOVIES_ROOT / new_filename
+
+    try:
+        # Create destination root if it doesn't exist
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        print(f"[ORGANIZE] Manually Moving: {file_path.name} -> {dest_path}")
+        shutil.move(str(file_path), str(dest_path))
+        return True, str(dest_path)
+    except Exception as e:
+        print(f"[ORGANIZE] [ERROR] Failed to move {file_path.name}: {e}")
+        return False, str(e)
+
+
 def cleanup_empty_dirs(path: Path):
     """Remove empty directories recursively."""
     for d in os.listdir(path):
