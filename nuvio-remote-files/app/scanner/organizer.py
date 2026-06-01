@@ -60,9 +60,28 @@ def parse_filename(filename: str):
         season = int(ep_match.group("season"))
         episode = int(ep_match.group("episode"))
         
-        # Title is everything before the match
-        title_raw = stem[:ep_match.start()].strip(" .-_")
-        title = clean_name(title_raw)
+        # Extract title: look before AND after the match
+        title_before = stem[:ep_match.start()].strip(" .-_")
+        title_after = stem[ep_match.end():].strip(" .-_")
+        
+        if title_before:
+            title = clean_name(title_before)
+        else:
+            # If nothing before, use everything after up to the resolution or year
+            # We can simplify by taking title_after and cleaning it from common tags
+            potential_title = title_after
+            
+            # Remove resolution from title if present
+            res_match_in_after = RESOLUTION_PATTERN.search(potential_title)
+            if res_match_in_after:
+                potential_title = potential_title[:res_match_in_after.start()].strip(" .-_")
+            
+            # Remove year from title if present
+            year_match_in_after = YEAR_PATTERN.search(potential_title)
+            if year_match_in_after:
+                potential_title = potential_title[:year_match_in_after.start()].strip(" .-_")
+            
+            title = clean_name(potential_title)
         
         return True, title, None, season, episode, resolution
 

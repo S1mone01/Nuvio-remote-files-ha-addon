@@ -33,11 +33,6 @@ def startup():
     """
     init_db()
 
-    # Initial library scan (runs once on startup)
-    organize_downloads()
-    scan_movies()
-    scan_series()
-
 
 # Public Stremio addon endpoints
 app.include_router(stremio_router)

@@ -176,6 +176,15 @@ async def admin_downloads_rename(request: Request):
         return {"status": "error", "message": result}
 
 
+@router.post("/admin/downloads/organize")
+def admin_downloads_organize(request: Request):
+    """
+    Manually trigger the organization of the downloads directory.
+    """
+    organize_downloads()
+    return {"status": "ok"}
+
+
 # ── Admin pages ──────────────────────────────────────────────────────
 
 # These pages are intentionally unauthenticated.
@@ -191,7 +200,6 @@ def admin_page(request: Request):
 
 @router.post("/admin/scan")
 def admin_scan(request: Request):
-    organize_downloads()
     scan_movies()
     scan_series()
 
@@ -203,7 +211,6 @@ def admin_scan(request: Request):
 
 @router.post("/admin/scan/rebuild")
 def admin_scan_rebuild(request: Request):
-    organize_downloads()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("DELETE FROM files")
         conn.execute("DELETE FROM episodes")
