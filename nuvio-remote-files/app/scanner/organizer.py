@@ -197,13 +197,46 @@ def organize_downloads():
     print("[ORGANIZE] Organization complete.")
 
 
+def smart_lookup_series(title: str):
+    """
+    Try to find a series on TMDB. If direct lookup fails, try shortening the title
+    word by word from the right (to handle cases where episode title is included).
+    """
+    current_title = clean_name(title)
+    print(f"[ORGANIZE] Smart lookup start: '{current_title}'")
+    
+    meta = lookup_series(current_title)
+    if meta:
+        return meta
+    
+    # Fallback: try shortening word by word
+    words = current_title.split()
+    attempts = [current_title]
+    
+    while len(words) > 1:
+        words.pop()
+        shorter_title = clean_name(" ".join(words))
+        if shorter_title in attempts:
+            continue
+            
+        attempts.append(shorter_title)
+        print(f"[ORGANIZE] Fallback lookup attempt: '{shorter_title}'")
+        meta = lookup_series(shorter_title)
+        if meta:
+            print(f"[ORGANIZE] Found match for '{shorter_title}': {meta['title']}")
+            return meta
+    
+    print(f"[ORGANIZE] Smart lookup failed for all attempts: {attempts}")
+    return None
+
+
 def move_file(file_path: Path, is_series: bool, title: str, year: int = None, season: int = None, episode: int = None, resolution: str = None):
     """Move a specific file to its destination based on provided metadata."""
     # Note: resolution here acts as the 'tags' string from the UI if manually edited
     if is_series:
-        meta = lookup_series(title)
+        meta = smart_lookup_series(title)
         if not meta:
-            return False, f"Series not found: {title}"
+            return False, f"Serie non trovata su TMDB dopo vari tentativi. Prova a inserire solo il nome della serie (es. 'The Mentalist')."
         
         clean_title = meta["title"]
         season_dir = SERIES_ROOT / clean_title / f"Season {season:02d}"
