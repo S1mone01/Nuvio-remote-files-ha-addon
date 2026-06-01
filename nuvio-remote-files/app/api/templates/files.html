@@ -979,7 +979,8 @@ async function testDebugParse() {
                 orgHtml += `<strong>Anno:</strong> ${org.year || 'N/D'}<br>`;
             }
             orgHtml += `<strong>Tag:</strong> ${org.tags || 'Nessuno'}<br>`;
-            orgHtml += `<strong>TMDB:</strong> ${org.tmdb} ${org.tmdb_title ? '('+org.tmdb_title+')' : ''}`;
+            orgHtml += `<strong>TMDB:</strong> ${org.tmdb} ${org.tmdb_title ? '('+org.tmdb_title+')' : ''}<br>`;
+            orgHtml += `<strong>File Finale:</strong> <span style="color:var(--success)">${org.final_filename}</span>`;
             document.getElementById('organizer-output').innerHTML = orgHtml;
             
             // Stremio Output

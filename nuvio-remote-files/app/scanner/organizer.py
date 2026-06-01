@@ -16,7 +16,7 @@ from core.config import (
     SERIES_DIR_NAME,
     DOWNLOADS_DIR_NAME,
 )
-from metadata.tmdb import lookup_movie, lookup_series
+from metadata.tmdb import lookup_movie, lookup_series, lookup_episode
 
 # Base paths
 MEDIA_ROOT = Path("/media")
@@ -156,13 +156,18 @@ def organize_downloads():
                 print(f"[ORGANIZE] [SKIP] Series not found on TMDB: {title}")
                 continue
             
-            clean_title = meta["title"]
-            season_dir = SERIES_ROOT / clean_title / f"Season {season:02d}"
+            clean_series_title = meta["title"]
+            season_dir = SERIES_ROOT / clean_series_title / f"Season {season:02d}"
             season_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Try to get episode title
+            ep_meta = lookup_episode(meta["tmdb_id"], season, episode)
+            # Use episode title if found, otherwise fallback to series title
+            display_title = ep_meta["title"] if ep_meta and ep_meta.get("title") else clean_series_title
             
             tag_suffix = f" [{tags}]" if tags else ""
 
-            new_filename = f"S{season:02d}E{episode:02d} {clean_title}{tag_suffix}{path.suffix}"
+            new_filename = f"S{season:02d}E{episode:02d} {display_title}{tag_suffix}{path.suffix}"
             dest_path = season_dir / new_filename
             
             try:
@@ -238,12 +243,16 @@ def move_file(file_path: Path, is_series: bool, title: str, year: int = None, se
         if not meta:
             return False, f"Serie non trovata su TMDB dopo vari tentativi. Prova a inserire solo il nome della serie (es. 'The Mentalist')."
         
-        clean_title = meta.get("title", title)
-        season_dir = SERIES_ROOT / clean_title / f"Season {season:02d}"
+        clean_series_title = meta.get("title", title)
+        season_dir = SERIES_ROOT / clean_series_title / f"Season {season:02d}"
         season_dir.mkdir(parents=True, exist_ok=True)
         
+        # Try to get episode title
+        ep_meta = lookup_episode(meta.get("tmdb_id"), season, episode)
+        display_title = ep_meta["title"] if ep_meta and ep_meta.get("title") else clean_series_title
+        
         tag_suffix = f" [{resolution}]" if resolution else ""
-        new_filename = f"S{season:02d}E{episode:02d} {clean_title}{tag_suffix}{file_path.suffix}"
+        new_filename = f"S{season:02d}E{episode:02d} {display_title}{tag_suffix}{file_path.suffix}"
         dest_path = season_dir / new_filename
     else:
         meta = lookup_movie(title, year)

@@ -210,12 +210,33 @@ async def admin_debug_parse(request: Request):
     
     tmdb_status = "Not checked"
     clean_meta = None
+    final_filename = "N/D"
+    
+    from scanner.organizer import smart_lookup_series
+    from metadata.tmdb import lookup_episode
+
     if is_series:
-        clean_meta = lookup_series(title)
-        tmdb_status = "Found" if clean_meta else "Not Found"
+        clean_meta = smart_lookup_series(title)
+        if clean_meta:
+            tmdb_status = "Found"
+            # Try to get episode title for final name preview
+            ep_meta = lookup_episode(clean_meta["tmdb_id"], season, episode)
+            display_title = ep_meta["title"] if ep_meta and ep_meta.get("title") else clean_meta["title"]
+            tag_suffix = f" [{tags}]" if tags else ""
+            # Simulate extension from input or default to .mkv
+            ext = "".join(Path(filename).suffixes) or ".mkv"
+            final_filename = f"S{season:02d}E{episode:02d} {display_title}{tag_suffix}{ext}"
+        else:
+            tmdb_status = "Not Found"
     else:
         clean_meta = lookup_movie(title, year)
-        tmdb_status = "Found" if clean_meta else "Not Found"
+        if clean_meta:
+            tmdb_status = "Found"
+            tag_suffix = f" [{tags}]" if tags else ""
+            ext = "".join(Path(filename).suffixes) or ".mkv"
+            final_filename = f"{clean_meta['title']} ({clean_meta['year']}){tag_suffix}{ext}"
+        else:
+            tmdb_status = "Not Found"
 
     # 2. Test Scanner/Stremio Compatibility (Clean/Structured -> DB/Stremio)
     # This checks if the SxEx pattern is found for Stremio matching
@@ -232,7 +253,8 @@ async def admin_debug_parse(request: Request):
             "episode": episode,
             "tags": tags,
             "tmdb": tmdb_status,
-            "tmdb_title": clean_meta["title"] if clean_meta else None
+            "tmdb_title": clean_meta["title"] if clean_meta else None,
+            "final_filename": final_filename
         },
         "stremio": {
             "compatible": stremio_compatible,

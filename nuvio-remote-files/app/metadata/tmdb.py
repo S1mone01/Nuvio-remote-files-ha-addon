@@ -118,8 +118,24 @@ def lookup_series(title: str):
     )
 
     return {
+        "tmdb_id": tmdb_id,
         "imdb_id": imdb_id,
         "title": details.get("name"),
         "genres": genres,
         "poster_url": poster_url,
+    }
+
+
+def lookup_episode(series_tmdb_id: int, season: int, episode: int):
+    """
+    Fetch details for a specific episode.
+    """
+    path = f"/tv/{series_tmdb_id}/season/{season}/episode/{episode}"
+    details = _tmdb_get(path)
+    if not details:
+        return None
+    
+    return {
+        "title": details.get("name"),
+        "overview": details.get("overview")
     }
