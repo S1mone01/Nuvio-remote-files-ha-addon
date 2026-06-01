@@ -13,6 +13,7 @@ All destructive or privileged actions require a valid admin token.
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from pathlib import Path
 import sqlite3
 
 from scanner import scan_movies, scan_series
