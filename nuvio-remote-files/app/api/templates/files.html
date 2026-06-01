@@ -1014,15 +1014,33 @@ async function submitRename() {
 function playVlc(path) {
     // Percent-encode each path segment
     const safePath = path.split('/').map(p => encodeURIComponent(p)).join('/');
-    const url = window.location.origin + ingressPath + safePath;
+    
+    // Construct the absolute URL robustly
+    let baseUrl = window.location.origin + ingressPath;
+    if (baseUrl.endsWith('/') && safePath.startsWith('/')) {
+        baseUrl = baseUrl.slice(0, -1);
+    } else if (!baseUrl.endsWith('/') && !safePath.startsWith('/')) {
+        baseUrl = baseUrl + '/';
+    }
+    const fullUrl = baseUrl + safePath;
     
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    const vlcUrl = isIOS 
-        ? `vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(url)}`
-        : `vlc://${url}`;
+    let vlcUrl;
+    if (isIOS) {
+        vlcUrl = `vlc-x-callback://x-callback-url/stream?url=${encodeURIComponent(fullUrl)}`;
+    } else {
+        vlcUrl = `vlc://${fullUrl}`;
+    }
     
     console.log("Opening VLC with URL:", vlcUrl);
-    window.location.href = vlcUrl;
+    
+    // Fallback for some mobile browsers that block direct location changes
+    const a = document.createElement('a');
+    a.href = vlcUrl;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 100);
 }
 
 // ── Fetch data ───────────────────────────────────────────────────────
@@ -1195,7 +1213,7 @@ function renderMovieRow(file, tbody) {
         <td><span class="badge movie">Film</span></td>
         <td>
             <div class="file-title-wrap">
-                <button class="play-btn" onclick="playVlc('${file.path.replace(/'/g, "\\'")}')" title="Riproduci con VLC">
+                <button class="play-btn" title="Riproduci con VLC">
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                 </button>
                 <div>
@@ -1207,6 +1225,10 @@ function renderMovieRow(file, tbody) {
         <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '—'}</td>
         <td class="size-cell">${formatSize(file.size)}</td>
     `;
+    tr.querySelector('.play-btn').onclick = (e) => {
+        e.stopPropagation();
+        playVlc(file.path);
+    };
     tbody.appendChild(tr);
 }
 
@@ -1249,7 +1271,7 @@ function renderSeriesGroup(group, tbody) {
                         <td></td>
                         <td class="indent">
                             <div style="padding-left: 20px" class="file-title-wrap">
-                                <button class="play-btn" onclick="playVlc('${ep.path.replace(/'/g, "\\'")}')" title="Riproduci con VLC">
+                                <button class="play-btn" title="Riproduci con VLC">
                                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                                 </button>
                                 <div>
@@ -1261,6 +1283,10 @@ function renderSeriesGroup(group, tbody) {
                         <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '—'}</td>
                         <td class="size-cell">${formatSize(ep.size)}</td>
                     `;
+                    epRow.querySelector('.play-btn').onclick = (e) => {
+                        e.stopPropagation();
+                        playVlc(ep.path);
+                    };
                     tbody.appendChild(epRow);
                 });
             }
