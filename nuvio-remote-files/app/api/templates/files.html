@@ -813,6 +813,7 @@ let sortDir      = 'desc';
 let expandedGroups = new Set();
 
 const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
+const configuredBaseUrl = "{{ media_base_url if media_base_url else '' }}";
 
 // ── Custom Alert ───────────────────────────────────────────────────
 function showAlert(message, title = "Notifica") {
@@ -1015,14 +1016,19 @@ function playVlc(path) {
     // Percent-encode each path segment
     const safePath = path.split('/').map(p => encodeURIComponent(p)).join('/');
     
-    // Construct the absolute URL robustly
-    let baseUrl = window.location.origin + ingressPath;
-    if (baseUrl.endsWith('/') && safePath.startsWith('/')) {
-        baseUrl = baseUrl.slice(0, -1);
-    } else if (!baseUrl.endsWith('/') && !safePath.startsWith('/')) {
-        baseUrl = baseUrl + '/';
+    let fullUrl;
+    if (configuredBaseUrl) {
+        // Use the manually configured base URL (ideal for VLC/external players)
+        fullUrl = configuredBaseUrl.replace(/\/$/, '') + '/' + safePath.replace(/^\//, '');
+    } else {
+        // Fallback to dynamic URL (might fail on Home Assistant Ingress due to authentication)
+        let baseUrl = window.location.origin + ingressPath;
+        fullUrl = baseUrl.replace(/\/$/, '') + '/' + safePath.replace(/^\//, '');
+        
+        if (ingressPath) {
+            console.warn("VLC playback might fail via Ingress due to authentication. Configure 'media_base_url' in the addon options for better results.");
+        }
     }
-    const fullUrl = baseUrl + safePath;
     
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     let vlcUrl;
@@ -1034,7 +1040,12 @@ function playVlc(path) {
     
     console.log("Opening VLC with URL:", vlcUrl);
     
-    // Fallback for some mobile browsers that block direct location changes
+    // Check if we are on Ingress and it's the first time
+    if (ingressPath && !configuredBaseUrl && !localStorage.getItem('vlc_ingress_warned')) {
+        showAlert("Stai usando l'accesso tramite Home Assistant Ingress. Se VLC non riesce a caricare il video, configura l'opzione 'media_base_url' con l'IP locale (es. http://192.168.1.10:8080) nelle impostazioni dell'addon.", "Info Riproduzione");
+        localStorage.setItem('vlc_ingress_warned', 'true');
+    }
+
     const a = document.createElement('a');
     a.href = vlcUrl;
     a.style.display = 'none';
