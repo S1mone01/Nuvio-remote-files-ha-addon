@@ -154,26 +154,32 @@ async def admin_downloads_rename(request: Request):
     Manually rename and organize a file from the downloads directory.
     """
     from scanner.organizer import move_file, DOWNLOADS_ROOT
-    data = await request.json()
-    
-    path = DOWNLOADS_ROOT / data["path"]
-    if not path.exists():
-        return {"status": "error", "message": "File not found"}
-    
-    success, result = move_file(
-        path,
-        is_series=data.get("is_series", False),
-        title=data.get("title"),
-        year=data.get("year"),
-        season=data.get("season"),
-        episode=data.get("episode"),
-        resolution=data.get("resolution")
-    )
-    
-    if success:
-        return {"status": "ok", "dest": result}
-    else:
-        return {"status": "error", "message": result}
+    try:
+        data = await request.json()
+        
+        path = DOWNLOADS_ROOT / data["path"]
+        if not path.exists():
+            return {"status": "error", "message": "File not found"}
+        
+        success, result = move_file(
+            path,
+            is_series=data.get("is_series", False),
+            title=data.get("title"),
+            year=data.get("year"),
+            season=data.get("season"),
+            episode=data.get("episode"),
+            resolution=data.get("resolution")
+        )
+        
+        if success:
+            return {"status": "ok", "dest": result}
+        else:
+            return {"status": "error", "message": result}
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[ERROR] Manual rename crash: {error_details}")
+        return {"status": "error", "message": f"Errore interno del server: {str(e)}"}
 
 
 @router.post("/admin/downloads/organize")

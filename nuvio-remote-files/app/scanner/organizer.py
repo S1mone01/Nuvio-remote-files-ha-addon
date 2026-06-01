@@ -238,7 +238,7 @@ def move_file(file_path: Path, is_series: bool, title: str, year: int = None, se
         if not meta:
             return False, f"Serie non trovata su TMDB dopo vari tentativi. Prova a inserire solo il nome della serie (es. 'The Mentalist')."
         
-        clean_title = meta["title"]
+        clean_title = meta.get("title", title)
         season_dir = SERIES_ROOT / clean_title / f"Season {season:02d}"
         season_dir.mkdir(parents=True, exist_ok=True)
         
@@ -250,8 +250,8 @@ def move_file(file_path: Path, is_series: bool, title: str, year: int = None, se
         if not meta:
             return False, f"Movie not found: {title} ({year})"
         
-        clean_title = meta["title"]
-        clean_year = meta["year"]
+        clean_title = meta.get("title", title)
+        clean_year = meta.get("year", year or "Unknown")
         tag_suffix = f" [{resolution}]" if resolution else ""
         new_filename = f"{clean_title} ({clean_year}){tag_suffix}{file_path.suffix}"
         dest_path = MOVIES_ROOT / new_filename
