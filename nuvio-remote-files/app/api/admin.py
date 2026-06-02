@@ -13,6 +13,7 @@ All destructive or privileged actions require a valid admin token.
 from fastapi import APIRouter, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from pathlib import Path
 import sqlite3
 
@@ -158,7 +159,8 @@ async def admin_downloads_rename(request: Request):
         if not path.exists():
             return {"status": "error", "message": "File not found"}
         
-        success, result = move_file(
+        success, result = await run_in_threadpool(
+            move_file,
             path,
             is_series=data.get("is_series", False),
             title=data.get("title"),
@@ -201,7 +203,8 @@ async def admin_library_rename(request: Request):
         if not path.exists():
             return {"status": "error", "message": f"File not found at {path}"}
         
-        success, result = move_file(
+        success, result = await run_in_threadpool(
+            move_file,
             path,
             is_series=data.get("is_series", False),
             title=data.get("title"),
@@ -257,7 +260,8 @@ async def admin_library_season_rename(request: Request):
             
             # Use the provided season and title to ensure consistency, 
             # but keep the episode from the filename.
-            success, result = move_file(
+            success, result = await run_in_threadpool(
+                move_file,
                 path,
                 is_series=True,
                 title=series_title,
@@ -465,7 +469,7 @@ async def admin_file_tracks(request: Request):
         else:
             path = DOWNLOADS_ROOT / file_path_str
             
-        tracks = get_mkv_tracks(path)
+        tracks = await run_in_threadpool(get_mkv_tracks, path)
         return {"status": "ok", "tracks": tracks}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -493,7 +497,7 @@ async def admin_file_tracks_update(request: Request):
         else:
             path = DOWNLOADS_ROOT / file_path_str
             
-        success, message = update_mkv_metadata(path, updates)
+        success, message = await run_in_threadpool(update_mkv_metadata, path, updates)
         return {"status": "ok" if success else "error", "message": message}
     except Exception as e:
         return {"status": "error", "message": str(e)}

@@ -40,6 +40,17 @@ def process_mkv_tracks(input_path: Path) -> Path:
     if not input_path.exists():
         return input_path
 
+    # If this is called individually (not part of a batch library filter),
+    # we need to manage the "is_running" state ourselves for the UI to show progress.
+    managed_running_state = False
+    if not FILTERING_STATUS["is_running"]:
+        FILTERING_STATUS["is_running"] = True
+        FILTERING_STATUS["total"] = 1
+        FILTERING_STATUS["processed"] = 0
+        FILTERING_STATUS["current_file"] = input_path.name
+        FILTERING_STATUS["last_error"] = None
+        managed_running_state = True
+
     try:
         # 1. Analyze with ffprobe
         FILTERING_STATUS["current_step"] = f"Analisi flussi..."
@@ -132,13 +143,13 @@ def process_mkv_tracks(input_path: Path) -> Path:
         
         # Map video
         for idx in video_indices:
-            ffmpeg_cmd.extend(["-map", f"0:{idx}"])
+            ffmpeg_cmd.extend(["map", f"0:{idx}"])
         # Map Italian audio
         for idx in audio_indices:
-            ffmpeg_cmd.extend(["-map", f"0:{idx}"])
+            ffmpeg_cmd.extend(["map", f"0:{idx}"])
         # Map ALL subtitles
         for idx in subtitle_indices:
-            ffmpeg_cmd.extend(["-map", f"0:{idx}"])
+            ffmpeg_cmd.extend(["map", f"0:{idx}"])
             
         # Copy streams and preserve all metadata/chapters
         # -c copy : Pure bitstream copy, 100% original quality
@@ -171,6 +182,9 @@ def process_mkv_tracks(input_path: Path) -> Path:
             temp_output.rename(input_path)
             FILTERING_STATUS["current_file_info"] = f"Completato! Recuperati {saved:.1f} MB"
         
+        if managed_running_state:
+            FILTERING_STATUS["processed"] = 1
+
         return input_path
 
     except Exception as e:
@@ -181,6 +195,12 @@ def process_mkv_tracks(input_path: Path) -> Path:
             try: os.remove(temp_output)
             except: pass
         return input_path
+    finally:
+        if managed_running_state:
+            # Short delay to let the UI see the completion if it was very fast
+            # but since this is synchronous in a thread, we just reset it.
+            FILTERING_STATUS["is_running"] = False
+            FILTERING_STATUS["current_step"] = ""
 
 def filter_existing_library():
     """

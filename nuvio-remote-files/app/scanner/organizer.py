@@ -149,6 +149,8 @@ def organize_downloads():
     """
     Recursively scan DOWNLOADS_ROOT, identify files, and move them.
     """
+    from scanner.ffmpeg_utils import FILTERING_STATUS
+    
     if not DOWNLOADS_ROOT.exists():
         print(f"[ORGANIZE] Downloads directory not found: {DOWNLOADS_ROOT}")
         return
@@ -160,64 +162,82 @@ def organize_downloads():
     print(f"[ORGANIZE] Starting organization in {DOWNLOADS_ROOT}...")
 
     # Iterate recursively over all files
+    files_to_process = []
     for path in DOWNLOADS_ROOT.rglob("*"):
-        if not path.is_file() or path.suffix.lower() not in VIDEO_EXTENSIONS:
-            continue
+        if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS:
+            files_to_process.append(path)
+    
+    if not files_to_process:
+        print("[ORGANIZE] No files to process.")
+        return
 
-        print(f"[ORGANIZE] Processing: {path.name}")
-        
-        process_mkv_if_enabled(path)
-        
-        is_series, title, year, season, episode, tags = parse_filename(path.name)
-        
-        if is_series:
-            # Series logic - use smart lookup to handle extra words in title
-            meta = smart_lookup_series(title)
-            if not meta:
-                print(f"[ORGANIZE] [SKIP] Series not found on TMDB: {title}")
-                continue
+    FILTERING_STATUS["is_running"] = True
+    FILTERING_STATUS["total"] = len(files_to_process)
+    FILTERING_STATUS["processed"] = 0
+    FILTERING_STATUS["last_error"] = None
 
-            clean_series_title = meta["title"]
-            season_dir = SERIES_ROOT / clean_series_title / f"Season {season:02d}"
-            season_dir.mkdir(parents=True, exist_ok=True)
-
-            # Try to get episode title
-            ep_meta = lookup_episode(meta.get("tmdb_id"), season, episode)
-            # Use episode title if found, otherwise fallback to series title
-            display_title = ep_meta["title"] if ep_meta and ep_meta.get("title") else clean_series_title
-
-            tag_suffix = f" [{tags}]" if tags else ""
-
-            new_filename = f"S{season:02d}E{episode:02d} {display_title}{tag_suffix}{path.suffix}"
-            dest_path = season_dir / new_filename
-
+    try:
+        for path in files_to_process:
+            FILTERING_STATUS["current_file"] = path.name
+            print(f"[ORGANIZE] Processing: {path.name}")
             
-            try:
-                print(f"[ORGANIZE] Moving Series: {path.name} -> {dest_path}")
-                shutil.move(str(path), str(dest_path))
-            except Exception as e:
-                print(f"[ORGANIZE] [ERROR] Failed to move {path.name}: {e}")
+            process_mkv_if_enabled(path)
+            
+            is_series, title, year, season, episode, tags = parse_filename(path.name)
+            
+            if is_series:
+                # Series logic - use smart lookup to handle extra words in title
+                meta = smart_lookup_series(title)
+                if not meta:
+                    print(f"[ORGANIZE] [SKIP] Series not found on TMDB: {title}")
+                    FILTERING_STATUS["processed"] += 1
+                    continue
 
-        else:
-            # Movie logic
-            meta = lookup_movie(title, year)
-            if not meta:
-                print(f"[ORGANIZE] [SKIP] Movie not found on TMDB: {title} ({year})")
-                continue
-            
-            clean_title = meta["title"]
-            clean_year = meta["year"]
-            tag_suffix = f" [{tags}]" if tags else ""
+                clean_series_title = meta["title"]
+                season_dir = SERIES_ROOT / clean_series_title / f"Season {season:02d}"
+                season_dir.mkdir(parents=True, exist_ok=True)
 
+                # Try to get episode title
+                ep_meta = lookup_episode(meta.get("tmdb_id"), season, episode)
+                # Use episode title if found, otherwise fallback to series title
+                display_title = ep_meta["title"] if ep_meta and ep_meta.get("title") else clean_series_title
+
+                tag_suffix = f" [{tags}]" if tags else ""
+
+                new_filename = f"S{season:02d}E{episode:02d} {display_title}{tag_suffix}{path.suffix}"
+                dest_path = season_dir / new_filename
+
+                try:
+                    print(f"[ORGANIZE] Moving Series: {path.name} -> {dest_path}")
+                    shutil.move(str(path), str(dest_path))
+                except Exception as e:
+                    print(f"[ORGANIZE] [ERROR] Failed to move {path.name}: {e}")
+            else:
+                # Movie logic
+                meta = lookup_movie(title, year)
+                if not meta:
+                    print(f"[ORGANIZE] [SKIP] Movie not found on TMDB: {title} ({year})")
+                    FILTERING_STATUS["processed"] += 1
+                    continue
+
+                clean_title = meta["title"]
+                clean_year = meta.get("year", year or "Unknown")
+                tag_suffix = f" [{tags}]" if tags else ""
+
+                new_filename = f"{clean_title} ({clean_year}){tag_suffix}{path.suffix}"
+                dest_path = MOVIES_ROOT / new_filename
+
+                try:
+                    print(f"[ORGANIZE] Moving Movie: {path.name} -> {dest_path}")
+                    shutil.move(str(path), str(dest_path))
+                except Exception as e:
+                    print(f"[ORGANIZE] [ERROR] Failed to move {path.name}: {e}")
             
-            new_filename = f"{clean_title} ({clean_year}){tag_suffix}{path.suffix}"
-            dest_path = MOVIES_ROOT / new_filename
-            
-            try:
-                print(f"[ORGANIZE] Moving Movie: {path.name} -> {dest_path}")
-                shutil.move(str(path), str(dest_path))
-            except Exception as e:
-                print(f"[ORGANIZE] [ERROR] Failed to move {path.name}: {e}")
+            FILTERING_STATUS["processed"] += 1
+    finally:
+        FILTERING_STATUS["is_running"] = False
+        FILTERING_STATUS["current_file"] = ""
+        FILTERING_STATUS["current_step"] = ""
 
     # Cleanup: remove empty directories in DOWNLOADS_ROOT
     cleanup_empty_dirs(DOWNLOADS_ROOT)
