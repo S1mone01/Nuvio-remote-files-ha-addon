@@ -9,7 +9,8 @@ RUN apk add --no-cache \
     python3 \
     py3-pip \
     curl \
-    bash
+    bash \
+    ffmpeg
 
 # Set up workdir
 WORKDIR /app

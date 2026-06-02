@@ -42,6 +42,9 @@ MOVIES_DIR_NAME = os.getenv("MOVIES_DIR_NAME", "movies")
 SERIES_DIR_NAME = os.getenv("SERIES_DIR_NAME", "series")
 DOWNLOADS_DIR_NAME = os.getenv("DOWNLOADS_DIR_NAME", "downloads")
 
+# MKV track filtering configuration
+FILTER_MKV_TRACKS = os.getenv("FILTER_MKV_TRACKS", "false").lower() == "true"
+
 
 def is_disk_online() -> bool:
     """

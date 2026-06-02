@@ -10,7 +10,7 @@ Note: The HTML pages themselves are intentionally unauthenticated.
 All destructive or privileged actions require a valid admin token.
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -18,6 +18,7 @@ import sqlite3
 
 from scanner import scan_movies, scan_series
 from scanner.organizer import organize_downloads
+from scanner.ffmpeg_utils import filter_existing_library, FILTERING_STATUS
 from core.config import DB_PATH, is_disk_online
 from core.auth import require_admin_token
 
@@ -313,6 +314,26 @@ async def admin_debug_parse(request: Request):
     except Exception as e:
         print(f"[ERROR] Debug parse crash: {traceback.format_exc()}")
         return {"status": "error", "message": f"Errore interno del server: {str(e)}"}
+
+
+@router.post("/admin/library/filter-mkv")
+def admin_library_filter_mkv(background_tasks: BackgroundTasks):
+    """
+    Trigger the MKV track filtering process for the entire library.
+    """
+    if FILTERING_STATUS["is_running"]:
+        return {"status": "error", "message": "Il processo è già in esecuzione"}
+    
+    background_tasks.add_task(filter_existing_library)
+    return {"status": "ok", "message": "Filtraggio avviato in background"}
+
+
+@router.get("/admin/library/filter-mkv/status")
+def admin_library_filter_mkv_status():
+    """
+    Get the current status of the MKV filtering process.
+    """
+    return FILTERING_STATUS
 
 
 # ── Admin pages ──────────────────────────────────────────────────────

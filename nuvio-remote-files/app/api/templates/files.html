@@ -606,6 +606,7 @@
     <nav>
         <a id="nav-library" onclick="showTab('library')" class="active">Libreria</a>
         <a id="nav-downloads" onclick="showTab('downloads')">Download</a>
+        <a onclick="startMkvFilter()" class="success" style="color: var(--accent);">Filtra Audio/Sub</a>
         <a onclick="manualScan()" class="success">Scansiona</a>
         <a onclick="resetDB()" class="warn">Reset</a>
         <a onclick="showDebugModal()">Debug</a>
@@ -778,6 +779,36 @@
                 <button class="filter-btn" onclick="closeRenameModal()">Annulla</button>
                 <button class="copy-btn" onclick="submitRename()">Organizza File</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- MKV Progress Modal -->
+<div class="modal-overlay" id="mkv-progress-modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <span>Filtraggio Tracce MKV</span>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom: 15px; color: var(--text);">Mantenimento solo audio e sottotitoli in italiano (senza ricodifica)...</p>
+            
+            <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span id="mkv-progress-text" style="font-weight: 600; color: var(--accent);">Inizializzazione...</span>
+                    <span id="mkv-progress-percent" style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
+                    <div id="mkv-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s;"></div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    File attuale: <span id="mkv-current-file" style="color: var(--text);">—</span>
+                </div>
+            </div>
+
+            <p style="font-size: 0.8rem; color: var(--muted);">Questo processo avviene in background. Puoi chiudere questa finestra, il filtraggio continuerà comunque.</p>
+        </div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+            <button class="copy-btn" onclick="closeMkvProgressModal()">Chiudi</button>
         </div>
     </div>
 </div>
@@ -1383,11 +1414,92 @@ function renderSeriesGroup(group, tbody) {
     }
 }
 
+// ── MKV Filter Logic ────────────────────────────────────────────────
+let mkvPollingInterval = null;
+
+async function startMkvFilter() {
+    const confirmed = await showConfirm("Desideri filtrare tutti i file MKV nella libreria mantenendo solo le tracce italiane? Questa operazione non ricodifica il video e non degrada la qualità.");
+    if (!confirmed) return;
+
+    try {
+        const resp = await fetch(ingressPath + '/admin/library/filter-mkv', { method: 'POST' });
+        const res = await resp.json();
+        
+        if (res.status === 'ok') {
+            openMkvProgressModal();
+            startMkvPolling();
+        } else {
+            showAlert(res.message, "Errore");
+        }
+    } catch (e) {
+        showAlert("Errore: " + e.message, "Errore");
+    }
+}
+
+function openMkvProgressModal() {
+    document.getElementById('mkv-progress-modal-overlay').style.display = 'flex';
+}
+
+function closeMkvProgressModal() {
+    document.getElementById('mkv-progress-modal-overlay').style.display = 'none';
+}
+
+function startMkvPolling() {
+    if (mkvPollingInterval) clearInterval(mkvPollingInterval);
+    
+    mkvPollingInterval = setInterval(async () => {
+        try {
+            const resp = await fetch(ingressPath + '/admin/library/filter-mkv/status');
+            const status = await resp.json();
+            
+            if (status.is_running) {
+                const processed = status.processed;
+                const total = status.total;
+                const current = status.current_file;
+                
+                const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+                
+                document.getElementById('mkv-progress-text').textContent = `Elaborati: ${processed} di ${total}`;
+                document.getElementById('mkv-progress-percent').textContent = `${percent}%`;
+                document.getElementById('mkv-progress-bar').style.width = `${percent}%`;
+                document.getElementById('mkv-current-file').textContent = current || '—';
+            } else {
+                clearInterval(mkvPollingInterval);
+                mkvPollingInterval = null;
+                
+                // If we were running and now stopped, it finished
+                document.getElementById('mkv-progress-text').textContent = `Completato!`;
+                document.getElementById('mkv-progress-percent').textContent = `100%`;
+                document.getElementById('mkv-progress-bar').style.width = `100%`;
+                document.getElementById('mkv-current-file').textContent = "Operazione terminata.";
+                
+                // Refresh library to see if sizes changed
+                loadFiles();
+            }
+        } catch (e) {
+            console.error("Polling error:", e);
+        }
+    }, 1500);
+}
+
+// Check on load if filtering is already running
+async function checkInitialFilteringStatus() {
+    try {
+        const resp = await fetch(ingressPath + '/admin/library/filter-mkv/status');
+        const status = await resp.json();
+        if (status.is_running) {
+            openMkvProgressModal();
+            startMkvPolling();
+        }
+    } catch (e) {}
+}
+
 document.getElementById('search').addEventListener('input', e => { searchQuery = e.target.value.trim(); render(); });
 document.querySelectorAll('.filter-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.dataset.filter; render(); }); });
 document.getElementById('sort-select').addEventListener('change', e => { const [key, dir] = e.target.value.split('-'); sortKey = key; sortDir = dir; render(); });
 document.querySelectorAll('thead th[data-col]').forEach(th => { th.addEventListener('click', () => { const col = th.dataset.col; if (sortKey === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; } else { sortKey = col; sortDir = 'desc'; } document.querySelectorAll('thead th').forEach(t => t.classList.remove('sort-asc','sort-desc')); th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc'); render(); }); });
 loadFiles();
+checkInitialFilteringStatus();
 </script>
 </body>
 </html>

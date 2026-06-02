@@ -15,6 +15,7 @@ from core.config import (
     MOVIES_DIR_NAME,
     SERIES_DIR_NAME,
     DOWNLOADS_DIR_NAME,
+    FILTER_MKV_TRACKS,
 )
 from scanner.utils import extract_tags, TAGS_PATTERN, clean_name
 from metadata.tmdb import lookup_movie, lookup_series, lookup_episode
@@ -27,6 +28,15 @@ DOWNLOADS_ROOT = MEDIA_ROOT / DOWNLOADS_DIR_NAME
 
 # Video extensions to process
 VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".wmv"}
+
+def process_mkv_if_enabled(path: Path):
+    """Filter MKV tracks if the option is enabled."""
+    if FILTER_MKV_TRACKS and path.suffix.lower() == ".mkv":
+        try:
+            from scanner.ffmpeg_utils import process_mkv_tracks
+            process_mkv_tracks(path)
+        except Exception as e:
+            print(f"[ORGANIZE] [ERROR] Failed to filter MKV {path.name}: {e}")
 
 def get_clean_stem(filename: str) -> tuple[str, str]:
     """
@@ -151,6 +161,8 @@ def organize_downloads():
 
         print(f"[ORGANIZE] Processing: {path.name}")
         
+        process_mkv_if_enabled(path)
+        
         is_series, title, year, season, episode, tags = parse_filename(path.name)
         
         if is_series:
@@ -273,6 +285,8 @@ def move_file(file_path: Path, is_series: bool, title: str, year: int = None, se
     try:
         # Create destination root if it doesn't exist
         dest_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        process_mkv_if_enabled(file_path)
         
         print(f"[ORGANIZE] Manually Moving: {file_path.name} -> {dest_path}")
         shutil.move(str(file_path), str(dest_path))
