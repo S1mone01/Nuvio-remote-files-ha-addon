@@ -16,6 +16,7 @@ from core.config import (
     SERIES_DIR_NAME,
     DOWNLOADS_DIR_NAME,
 )
+from scanner.utils import extract_tags, TAGS_PATTERN, clean_name
 from metadata.tmdb import lookup_movie, lookup_series, lookup_episode
 
 # Base paths
@@ -32,31 +33,6 @@ EPISODE_PATTERN = re.compile(r"S(?P<season>\d{1,2})E(?P<episode>\d{1,2})", re.IG
 ALT_EPISODE_PATTERN = re.compile(r"(?P<season>\d{1,2})x(?P<episode>\d{1,2})", re.IGNORECASE)
 YEAR_PATTERN = re.compile(r"\(?(?P<year>19\d{2}|20\d{2})\)?")
 
-# Comprehensive Tags Pattern (Languages removed as per user request)
-TAGS_LIST = [
-    # Sources
-    "CAM", "HDCAM", "TS", "HDTS", "TC", "PPV", "TVRip", "SATRip", "DSRip", "DVRip", "HDTV", "PDTV",
-    "WEBRip", "WEB-DL", "WEBCap", "DVDRip", "DVD5", "DVD9", "DVDRemux", "BDRip", "BRRip", "BluRay",
-    "BDRemux", "UHD BluRay", "UHD Remux", "Remux", "WEB Remux",
-    # Resolutions
-    "480p", "576p", "720p", "1080p", "1440p", "2160p", "4320p", "4K", "8K", "UHD", "HD",
-    # Codecs
-    "XviD", "DivX", "x264", "H\.264", "AVC", "x265", "H\.265", "HEVC", "AV1",
-    # HDR
-    "HDR10", "HDR10\+", "Dolby Vision", "DV", "HLG",
-    # Audio
-    "AAC", "AC3", "Dolby Digital", "E-AC3", "DTS", "DTS-HD MA", "Dolby TrueHD", "Dolby Atmos"
-]
-
-# Create a single pattern to find all tags
-TAGS_PATTERN = re.compile(r"\b(" + "|".join(TAGS_LIST) + r")\b", re.IGNORECASE)
-
-
-def clean_name(name: str) -> str:
-    """Remove dots, underscores and extra spaces from a name."""
-    return name.replace(".", " ").replace("_", " ").strip(" .-_()[]{}")
-
-
 def parse_filename(filename: str):
     """
     Parse a messy filename to extract title and metadata.
@@ -64,15 +40,8 @@ def parse_filename(filename: str):
     """
     stem = Path(filename).stem
     
-    # Find all tags
-    found_tags = []
-    # Using finditer to preserve order and avoid duplicates
-    for match in TAGS_PATTERN.finditer(stem):
-        tag = match.group(0).upper()
-        if tag not in found_tags:
-            found_tags.append(tag)
-    
-    tags_string = " ".join(found_tags) if found_tags else None
+    # Use centralized tag extraction
+    tags_string = extract_tags(stem)
 
     # Try to find series pattern
     ep_match = EPISODE_PATTERN.search(stem) or ALT_EPISODE_PATTERN.search(stem)
@@ -92,7 +61,7 @@ def parse_filename(filename: str):
             # Find the position of the first tag or year to truncate the title
             first_meta_pos = len(potential_title)
             
-            # Check for tags
+            # Check for tags using centralized pattern
             for match in TAGS_PATTERN.finditer(potential_title):
                 if match.start() < first_meta_pos:
                     first_meta_pos = match.start()

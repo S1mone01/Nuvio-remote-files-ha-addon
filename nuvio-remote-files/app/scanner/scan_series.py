@@ -10,6 +10,7 @@ import re
 import sqlite3
 
 from core.config import SERIES_DIR_NAME
+from scanner.utils import extract_tags
 from metadata.tmdb import lookup_series
 from db.series_repo import upsert_series, upsert_episode, upsert_episode_file
 
@@ -42,19 +43,6 @@ EPISODE_SE_PATTERN = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 
-# Resolution tokens (optional metadata, anywhere in filename)
-RESOLUTION_PATTERN = re.compile(
-    r"""
-    (?P<res>
-        240p | 360p | 480p | 576p | 720p | 900p |
-        1080p | 1440p | 2160p | 4320p |
-        480i | 576i | 1080i |
-        2K | 4K | 8K
-    )
-    """,
-    re.IGNORECASE | re.VERBOSE,
-)
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -62,10 +50,10 @@ RESOLUTION_PATTERN = re.compile(
 
 def parse_episode_filename(filename: str):
     """
-    Extract season, episode, and optional resolution from an episode filename.
+    Extract season, episode, and optional tags from an episode filename.
 
     Returns:
-        (season_from_file: int, episode: int, resolution: str | None)
+        (season_from_file: int, episode: int, tags: str | None)
         or None if no SxEx pattern is found.
     """
     se_match = EPISODE_SE_PATTERN.search(filename)
@@ -75,10 +63,10 @@ def parse_episode_filename(filename: str):
     season_from_file = int(se_match.group("season"))
     episode = int(se_match.group("episode"))
 
-    res_match = RESOLUTION_PATTERN.search(filename)
-    resolution = res_match.group("res") if res_match else None
+    # Use centralized tag extraction
+    tags = extract_tags(filename)
 
-    return season_from_file, episode, resolution
+    return season_from_file, episode, tags
 
 
 # ---------------------------------------------------------------------------

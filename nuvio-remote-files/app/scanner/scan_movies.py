@@ -10,6 +10,7 @@ import re
 import sqlite3
 
 from core.config import MOVIES_DIR_NAME
+from scanner.utils import extract_tags, clean_name
 from metadata.tmdb import lookup_movie
 from db.movie_repo import upsert_movie, upsert_movie_file
 
@@ -18,19 +19,6 @@ MOVIES_ROOT = Path("/media") / MOVIES_DIR_NAME
 
 # SQLite database location
 DB_PATH = "/data/library.db"
-
-# Expected filename format:
-#   Movie Title (YYYY) [1080p].ext
-MOVIE_PATTERN = re.compile(
-    r"""
-    ^(?P<title>.+?)            # Movie title
-    \s*\( (?P<year>\d{4}) \)   # Year in parentheses
-    (?:\s*\[(?P<res>\d+p)\])?  # Optional [1080p]
-    \.\w+$                     # File extension
-    """,
-    re.VERBOSE | re.IGNORECASE,
-)
-
 
 def scan_movies():
     """
@@ -48,24 +36,30 @@ def scan_movies():
     conn = sqlite3.connect(DB_PATH)
     seen_paths = set()
 
+    # Regex for extracting title and year from standardized format: Title (YYYY) [Tags].ext
+    PARSER_PATTERN = re.compile(r"^(?P<title>.+?)\s*\((?P<year>\d{4})\)", re.IGNORECASE)
+
     try:
         for path in MOVIES_ROOT.iterdir():
             if not path.is_file():
                 continue
 
-            match = MOVIE_PATTERN.match(path.name)
+            # Skip common non-video files
+            if path.suffix.lower() not in {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".wmv"}:
+                continue
+
+            match = PARSER_PATTERN.match(path.name)
             if not match:
                 print(f"[SKIP] Unrecognized movie filename: {path.name}")
                 continue
 
-            data = match.groupdict()
-
-            title = data["title"]
-            year = int(data["year"])
-            resolution = data.get("res")
+            title = clean_name(match.group("title"))
+            year = int(match.group("year"))
+            
+            # Extract tags using centralized logic
+            tags = extract_tags(path.name)
 
             print(f"[INFO] TMDB lookup: {title} ({year})")
-
             meta = lookup_movie(title, year)
 
             if not meta:
@@ -83,7 +77,7 @@ def scan_movies():
                 conn,
                 imdb_id=meta["imdb_id"],
                 path=str(path),
-                resolution=resolution,
+                resolution=tags, # Using resolution column for all tags
                 size=path.stat().st_size,
             )
 
