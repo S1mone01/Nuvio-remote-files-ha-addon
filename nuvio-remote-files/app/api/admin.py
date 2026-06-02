@@ -286,12 +286,30 @@ async def admin_library_season_rename(request: Request):
 
 
 @router.post("/admin/downloads/organize")
-def admin_downloads_organize(request: Request):
+def admin_downloads_organize(request: Request, background_tasks: BackgroundTasks):
     """
     Manually trigger the organization of the downloads directory.
     """
-    organize_downloads()
+    background_tasks.add_task(organize_downloads)
     return {"status": "ok"}
+
+
+@router.post("/admin/downloads/organize-selected")
+async def admin_downloads_organize_selected(request: Request, background_tasks: BackgroundTasks):
+    """
+    Manually trigger the organization of selected files from the downloads directory.
+    """
+    from scanner.organizer import organize_selected_downloads
+    try:
+        data = await request.json()
+        paths = data.get("paths", [])
+        if not paths:
+            return {"status": "error", "message": "Nessun file selezionato"}
+        
+        background_tasks.add_task(organize_selected_downloads, paths)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/admin/debug/parse")

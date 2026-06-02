@@ -693,7 +693,13 @@
     <div class="toolbar">
         <div style="font-weight: 600; font-size: 1.1rem;">File in Download</div>
         <div style="color: var(--muted); font-size: 0.85rem; margin-left: 12px; flex: 1;">I file qui sotto non sono stati ancora spostati nella libreria.</div>
-        <button class="copy-btn success" onclick="organizeAllDownloads()" style="padding: 8px 16px;">Identifica Tutto</button>
+        
+        <div class="filter-group">
+            <button class="filter-btn" onclick="selectAllDownloads()">Seleziona Tutti</button>
+            <button class="filter-btn" onclick="deselectAllDownloads()">Rimuovi Tutte</button>
+            <button class="copy-btn success" id="btn-identify-selected" onclick="organizeSelectedDownloads()" style="padding: 8px 16px; display: none;">Identifica Selezionati</button>
+            <button class="copy-btn success" onclick="organizeAllDownloads()" style="padding: 8px 16px;">Identifica Tutto</button>
+        </div>
     </div>
     
     <div class="table-wrap">
@@ -710,6 +716,7 @@
         <table id="downloads-table" style="display:none">
             <thead>
                 <tr>
+                    <th style="width: 40px"></th>
                     <th>Nome File / Percorso</th>
                     <th>Stato</th>
                     <th>Azione</th>
@@ -1142,6 +1149,48 @@ async function organizeAllDownloads() {
     }
 }
 
+async function organizeSelectedDownloads() {
+    const selectedPaths = Array.from(document.querySelectorAll('.download-checkbox:checked')).map(cb => cb.dataset.path);
+    if (selectedPaths.length === 0) return;
+
+    try {
+        openMkvProgressModal();
+        document.getElementById('mkv-current-step').textContent = "Avvio organizzazione selezionati...";
+        startMkvPolling();
+
+        const resp = await fetch(ingressPath + '/admin/downloads/organize-selected', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: selectedPaths })
+        });
+        const data = await resp.json();
+    } catch (e) {
+        closeMkvProgressModal();
+        showAlert("Errore: " + e.message, "Errore");
+    }
+}
+
+function selectAllDownloads() {
+    document.querySelectorAll('.download-checkbox').forEach(cb => cb.checked = true);
+    updateIdentifySelectedButton();
+}
+
+function deselectAllDownloads() {
+    document.querySelectorAll('.download-checkbox').forEach(cb => cb.checked = false);
+    updateIdentifySelectedButton();
+}
+
+function updateIdentifySelectedButton() {
+    const selectedCount = document.querySelectorAll('.download-checkbox:checked').length;
+    const btn = document.getElementById('btn-identify-selected');
+    if (selectedCount > 0) {
+        btn.style.display = 'inline-block';
+        btn.textContent = `Identifica Selezionati (${selectedCount})`;
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
 // ── Manual Rename Logic ─────────────────────────────────────────────
 let currentTracks = [];
 
@@ -1446,6 +1495,7 @@ function renderDownloads() {
     if (downloads.length === 0) {
         document.getElementById('downloads-table').style.display = 'none';
         document.getElementById('empty-downloads').style.display = 'block';
+        updateIdentifySelectedButton();
         return;
     }
 
@@ -1466,6 +1516,9 @@ function renderDownloads() {
         }
 
         tr.innerHTML = `
+            <td style="text-align: center;">
+                <input type="checkbox" class="download-checkbox" data-path="${escapeHtml(file.path)}" onchange="updateIdentifySelectedButton()" style="width: 18px; height: 18px; cursor: pointer;">
+            </td>
             <td>
                 <div class="file-title">${escapeHtml(file.name)}</div>
                 <div class="file-path">${escapeHtml(file.path)}</div>
@@ -1477,6 +1530,7 @@ function renderDownloads() {
         `;
         tbody.appendChild(tr);
     });
+    updateIdentifySelectedButton();
 }
 function render() {
     seasonDataMap.clear();

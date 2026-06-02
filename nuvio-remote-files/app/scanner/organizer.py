@@ -149,8 +149,6 @@ def organize_downloads():
     """
     Recursively scan DOWNLOADS_ROOT, identify files, and move them.
     """
-    from scanner.ffmpeg_utils import FILTERING_STATUS
-    
     if not DOWNLOADS_ROOT.exists():
         print(f"[ORGANIZE] Downloads directory not found: {DOWNLOADS_ROOT}")
         return
@@ -166,6 +164,30 @@ def organize_downloads():
     for path in DOWNLOADS_ROOT.rglob("*"):
         if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS:
             files_to_process.append(path)
+    
+    _run_organization(files_to_process)
+
+
+def organize_selected_downloads(relative_paths: list[str]):
+    """
+    Organize a specific list of files from DOWNLOADS_ROOT.
+    """
+    if not DOWNLOADS_ROOT.exists():
+        return
+
+    files_to_process = []
+    for rel_path in relative_paths:
+        path = DOWNLOADS_ROOT / rel_path
+        if path.exists() and path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS:
+            files_to_process.append(path)
+    
+    if files_to_process:
+        _run_organization(files_to_process)
+
+
+def _run_organization(files_to_process: list[Path]):
+    """Internal helper to run the organization loop for a list of files."""
+    from scanner.ffmpeg_utils import FILTERING_STATUS
     
     if not files_to_process:
         print("[ORGANIZE] No files to process.")
