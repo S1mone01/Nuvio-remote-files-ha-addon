@@ -15,7 +15,7 @@ TAGS_LIST = [
     # Audio
     "AAC", "AC3", "Dolby Digital", "E-AC3", "DTS", "DTS-HD MA", "Dolby TrueHD", "Dolby Atmos",
     # Common Tags
-    "MULTISUB", "MULTI", "DUBBED", "5\.1", "7\.1"
+    "DUBBED", "5\.1", "7\.1"
 ]
 
 TAGS_PATTERN = re.compile(r"\b(" + "|".join(TAGS_LIST) + r")\b", re.IGNORECASE)
