@@ -1086,12 +1086,27 @@ async function testDebugParse() {
 }
 
 async function organizeAllDownloads() {
+    // Check status first to resume if already running
     try {
+        const statusResp = await fetch(ingressPath + '/admin/library/filter-mkv/status');
+        const status = await statusResp.json();
+        if (status.is_running) {
+            openMkvProgressModal();
+            startMkvPolling();
+            return;
+        }
+    } catch (e) {}
+
+    try {
+        openMkvProgressModal();
+        document.getElementById('mkv-current-step').textContent = "Avvio organizzazione...";
+        startMkvPolling();
+
         const resp = await fetch(ingressPath + '/admin/downloads/organize', { method: 'POST' });
         const data = await resp.json();
-        showAlert("Identificazione completata!");
-        loadDownloads();
+        // UI polling will take care of the rest if background tasks are running
     } catch (e) {
+        closeMkvProgressModal();
         showAlert("Errore: " + e.message, "Errore");
     }
 }
@@ -1227,7 +1242,6 @@ async function submitRename() {
             const trackRes = await trackResp.json();
             if (trackRes.status !== 'ok') {
                 console.error("Errore aggiornamento tracce:", trackRes.message);
-                // We continue anyway, but maybe log it
             }
         } catch (e) {
             console.error("Errore connessione aggiornamento tracce:", e);
@@ -1254,6 +1268,15 @@ async function submitRename() {
     
     const endpoint = isLibrary ? '/admin/library/rename' : '/admin/downloads/rename';
     
+    // Close rename modal immediately and show progress if it's an MKV (as it might be filtered)
+    closeRenameModal();
+    if (path.toLowerCase().endsWith('.mkv')) {
+        openMkvProgressModal();
+        // Set an initial step text
+        document.getElementById('mkv-current-step').textContent = "Avvio elaborazione...";
+        startMkvPolling();
+    }
+
     try {
         const resp = await fetch(ingressPath + endpoint, {
             method: 'POST',
@@ -1262,18 +1285,17 @@ async function submitRename() {
         });
         const res = await resp.json();
         if (res.status === 'ok') {
-            closeRenameModal();
-            showAlert("File organizzato con successo!");
-            if (isLibrary) {
-                // If it's library, we need to rescannot to update the DB
-                manualScan();
-            } else {
-                loadDownloads();
+            if (!path.toLowerCase().endsWith('.mkv')) {
+                showAlert("File organizzato con successo!");
             }
+            if (isLibrary) manualScan();
+            else loadDownloads();
         } else {
+            closeMkvProgressModal();
             showAlert("Errore: " + res.message, "Errore");
         }
     } catch (e) {
+        closeMkvProgressModal();
         showAlert("Errore durante l'invio: " + e.message, "Errore");
     }
 }
