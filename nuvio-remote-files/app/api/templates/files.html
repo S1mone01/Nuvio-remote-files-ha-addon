@@ -1418,6 +1418,20 @@ function renderSeriesGroup(group, tbody) {
 let mkvPollingInterval = null;
 
 async function startMkvFilter() {
+    // First, check if it's already running
+    try {
+        const statusResp = await fetch(ingressPath + '/admin/library/filter-mkv/status');
+        const status = await statusResp.json();
+        
+        if (status.is_running) {
+            openMkvProgressModal();
+            startMkvPolling();
+            return;
+        }
+    } catch (e) {
+        console.error("Status check error:", e);
+    }
+
     const confirmed = await showConfirm("Desideri filtrare tutti i file MKV nella libreria mantenendo solo le tracce italiane? Questa operazione non ricodifica il video e non degrada la qualità.");
     if (!confirmed) return;
 
