@@ -1612,7 +1612,8 @@ function renderSeriesGroup(group, tbody) {
             sRow.className = 'group-row indent' + (expandedGroups.has(seasonId) ? ' expanded' : '');
             const eps = group.seasons.get(seasonNum);
             const sCommonRes = getCommonResolution(eps);
-            const seasonActions = `<span class="btn-edit" onclick='event.stopPropagation(); openSeasonTagModal(${JSON.stringify({ series_title: group.title, season: seasonNum, resolution: sCommonRes, episodes: eps.map(e => e.path) }).replace(/'/g, "&apos;")})' title="Modifica TAG Stagione">${PENCIL_SVG}</span>`;
+            const seasonData = { series_title: group.title, season: seasonNum, resolution: sCommonRes, episodes: eps.map(e => e.path) };
+            const seasonActions = `<span class="btn-edit" onclick='event.stopPropagation(); openSeasonTagModal(JSON.parse(atob("${btoa(JSON.stringify(seasonData))}"))) ' title="Modifica TAG Stagione">${PENCIL_SVG}</span>`;
             sRow.innerHTML = `
                 <td style="text-align: center; white-space: nowrap;">${seasonActions}</td>
                 <td></td>
