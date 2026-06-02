@@ -13,7 +13,9 @@ TAGS_LIST = [
     # HDR
     "HDR10", "HDR10\+", "Dolby Vision", "DV", "HLG",
     # Audio
-    "AAC", "AC3", "Dolby Digital", "E-AC3", "DTS", "DTS-HD MA", "Dolby TrueHD", "Dolby Atmos"
+    "AAC", "AC3", "Dolby Digital", "E-AC3", "DTS", "DTS-HD MA", "Dolby TrueHD", "Dolby Atmos",
+    # Common Tags
+    "MULTISUB", "MULTI", "DUBBED", "5\.1", "7\.1"
 ]
 
 TAGS_PATTERN = re.compile(r"\b(" + "|".join(TAGS_LIST) + r")\b", re.IGNORECASE)

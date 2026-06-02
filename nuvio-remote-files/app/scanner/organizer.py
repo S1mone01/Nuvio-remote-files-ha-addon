@@ -33,6 +33,9 @@ EPISODE_PATTERN = re.compile(r"S(?P<season>\d{1,2})E(?P<episode>\d{1,2})", re.IG
 ALT_EPISODE_PATTERN = re.compile(r"(?P<season>\d{1,2})x(?P<episode>\d{1,2})", re.IGNORECASE)
 YEAR_PATTERN = re.compile(r"\(?(?P<year>19\d{2}|20\d{2})\)?")
 
+# Language patterns for truncation
+LANG_PATTERN = re.compile(r"\b(ITA|ENG|FRA|GER|ESP|SPA|DEU|ITA\.ENG|ITA-ENG)\b", re.IGNORECASE)
+
 def parse_filename(filename: str):
     """
     Parse a messy filename to extract title and metadata.
@@ -55,23 +58,29 @@ def parse_filename(filename: str):
         title_after = stem[ep_match.end():].strip(" .-_")
         
         if title_before:
-            title = clean_name(title_before)
+            potential_title = title_before
         else:
             potential_title = title_after
-            # Find the position of the first tag or year to truncate the title
-            first_meta_pos = len(potential_title)
             
-            # Check for tags using centralized pattern
-            for match in TAGS_PATTERN.finditer(potential_title):
-                if match.start() < first_meta_pos:
-                    first_meta_pos = match.start()
+        # Truncate title at the first metadata or language tag
+        first_meta_pos = len(potential_title)
+        
+        # Check for tags using centralized pattern
+        for match in TAGS_PATTERN.finditer(potential_title):
+            if match.start() < first_meta_pos:
+                first_meta_pos = match.start()
+        
+        # Check for year
+        year_match = YEAR_PATTERN.search(potential_title)
+        if year_match and year_match.start() < first_meta_pos:
+            first_meta_pos = year_match.start()
             
-            # Check for year
-            year_match = YEAR_PATTERN.search(potential_title)
-            if year_match and year_match.start() < first_meta_pos:
-                first_meta_pos = year_match.start()
-                
-            title = clean_name(potential_title[:first_meta_pos])
+        # Check for language tags (extra safety for recognition)
+        lang_match = LANG_PATTERN.search(potential_title)
+        if lang_match and lang_match.start() < first_meta_pos:
+            first_meta_pos = lang_match.start()
+            
+        title = clean_name(potential_title[:first_meta_pos])
         
         return True, title, None, season, episode, tags_string
 
@@ -80,7 +89,18 @@ def parse_filename(filename: str):
     if year_match:
         year = int(year_match.group("year"))
         title_raw = stem[:year_match.start()].strip(" .-_")
-        title = clean_name(title_raw)
+        
+        # Truncate title_raw at first tag or language
+        first_meta_pos = len(title_raw)
+        for match in TAGS_PATTERN.finditer(title_raw):
+            if match.start() < first_meta_pos:
+                first_meta_pos = match.start()
+        
+        lang_match = LANG_PATTERN.search(title_raw)
+        if lang_match and lang_match.start() < first_meta_pos:
+            first_meta_pos = lang_match.start()
+            
+        title = clean_name(title_raw[:first_meta_pos])
         return False, title, year, None, None, tags_string
 
     # Fallback: assume movie
@@ -89,6 +109,10 @@ def parse_filename(filename: str):
     for match in TAGS_PATTERN.finditer(stem):
         if match.start() < first_meta_pos:
             first_meta_pos = match.start()
+    
+    lang_match = LANG_PATTERN.search(stem)
+    if lang_match and lang_match.start() < first_meta_pos:
+        first_meta_pos = lang_match.start()
     
     title = clean_name(stem[:first_meta_pos])
     
