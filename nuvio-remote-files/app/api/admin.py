@@ -328,6 +328,54 @@ def admin_library_filter_mkv(background_tasks: BackgroundTasks):
     return {"status": "ok", "message": "Filtraggio avviato in background"}
 
 
+@router.post("/admin/file/filter-mkv")
+async def admin_file_filter_mkv(request: Request, background_tasks: BackgroundTasks):
+    """
+    Trigger MKV filtering for a single file.
+    """
+    from scanner.ffmpeg_utils import process_mkv_tracks, FILTERING_STATUS
+    from scanner.organizer import DOWNLOADS_ROOT, MEDIA_ROOT
+    
+    if FILTERING_STATUS["is_running"]:
+        return {"status": "error", "message": "Un processo di filtraggio è già in corso"}
+
+    try:
+        data = await request.json()
+        file_path_str = data.get("path")
+        is_library = data.get("is_library", False)
+        
+        if is_library:
+            if file_path_str.startswith("/media/"):
+                path = Path(file_path_str)
+            else:
+                path = MEDIA_ROOT / file_path_str
+        else:
+            path = DOWNLOADS_ROOT / file_path_str
+
+        if not path.exists():
+            return {"status": "error", "message": "File non trovato"}
+
+        # We run this in background too to avoid timeout and reuse status
+        def single_file_task():
+            FILTERING_STATUS["is_running"] = True
+            FILTERING_STATUS["total"] = 1
+            FILTERING_STATUS["processed"] = 0
+            FILTERING_STATUS["current_file"] = path.name
+            FILTERING_STATUS["last_error"] = None
+            try:
+                process_mkv_tracks(path)
+                FILTERING_STATUS["processed"] = 1
+            except Exception as e:
+                FILTERING_STATUS["last_error"] = str(e)
+            finally:
+                FILTERING_STATUS["is_running"] = False
+
+        background_tasks.add_task(single_file_task)
+        return {"status": "ok", "message": "Filtraggio file avviato"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @router.get("/admin/library/filter-mkv/status")
 def admin_library_filter_mkv_status():
     """

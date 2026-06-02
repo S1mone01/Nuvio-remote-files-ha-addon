@@ -1353,14 +1353,19 @@ function renderDownloads() {
             ? '<span class="badge" style="background:rgba(247,129,102,0.15);color:var(--warn)">Non riconosciuto</span>'
             : '<span class="badge" style="background:rgba(88,166,255,0.15);color:var(--accent)">In attesa</span>';
 
+        let actions = `<button class="btn-rename" onclick='openRenameModal(${JSON.stringify(file).replace(/'/g, "&apos;")})'>Identifica</button>`;
+        if (file.path && file.path.toLowerCase().endsWith('.mkv')) {
+            actions += `<span class="btn-edit" style="color:var(--accent2); margin-left: 10px;" onclick='filterSingleFile(${JSON.stringify(file).replace(/'/g, "&apos;")}, false)' title="Filtra Audio/Sub ITA">${FILTER_SVG}</span>`;
+        }
+
         tr.innerHTML = `
             <td>
                 <div class="file-title">${escapeHtml(file.name)}</div>
                 <div class="file-path">${escapeHtml(file.path)}</div>
             </td>
             <td>${status}</td>
-            <td>
-                <button class="btn-rename" onclick='openRenameModal(${JSON.stringify(file).replace(/'/g, "&apos;")})'>Identifica</button>
+            <td style="white-space: nowrap;">
+                ${actions}
             </td>
         `;
         tbody.appendChild(tr);
@@ -1464,13 +1469,18 @@ function renderTags(tagString) {
 }
 
 const PENCIL_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
+const FILTER_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>`;
 
 function renderMovieRow(file, tbody) {
     const tr = document.createElement('tr');
-    const editBtn = `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(file).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
+    let actions = `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(file).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
+    
+    if (file.path && file.path.toLowerCase().endsWith('.mkv')) {
+        actions += `<span class="btn-edit" style="color:var(--accent2)" onclick='filterSingleFile(${JSON.stringify(file).replace(/'/g, "&apos;")}, true)' title="Filtra Audio/Sub ITA">${FILTER_SVG}</span>`;
+    }
     
     tr.innerHTML = `
-        <td style="text-align: center">${editBtn}</td>
+        <td style="text-align: center; white-space: nowrap;">${actions}</td>
         <td><span class="badge movie">Film</span></td>
         <td>
             <div class="file-title">${escapeHtml(file.title || basename(file.path))}</div>
@@ -1519,10 +1529,14 @@ function renderSeriesGroup(group, tbody) {
                 eps.sort((a,b) => (a.episode || 0) - (b.episode || 0)).forEach(ep => {
                     const epRow = document.createElement('tr');
                     epRow.className = 'nested-row visible';
-                    const editBtn = `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(ep).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
+                    let epActions = `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(ep).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
+                    
+                    if (ep.path && ep.path.toLowerCase().endsWith('.mkv')) {
+                        epActions += `<span class="btn-edit" style="color:var(--accent2)" onclick='filterSingleFile(${JSON.stringify(ep).replace(/'/g, "&apos;")}, true)' title="Filtra Audio/Sub ITA">${FILTER_SVG}</span>`;
+                    }
                     
                     epRow.innerHTML = `
-                        <td style="text-align: center; padding-left: 20px">${editBtn}</td>
+                        <td style="text-align: center; padding-left: 20px; white-space: nowrap;">${epActions}</td>
                         <td></td>
                         <td class="indent"><div style="padding-left: 20px"><div class="file-title">Episodio ${ep.episode}</div><div class="file-path">${escapeHtml(ep.path)}</div></div></td>
                         <td>${renderTags(ep.resolution)}</td>
@@ -1532,6 +1546,29 @@ function renderSeriesGroup(group, tbody) {
                 });
             }
         });
+    }
+}
+
+async function filterSingleFile(file, isLibrary) {
+    const confirmed = await showConfirm(`Desideri filtrare subito il file "${file.title || basename(file.path)}" mantenendo solo l'audio italiano?`);
+    if (!confirmed) return;
+
+    try {
+        const resp = await fetch(ingressPath + '/admin/file/filter-mkv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: file.path, is_library: isLibrary })
+        });
+        const res = await resp.json();
+        
+        if (res.status === 'ok') {
+            openMkvProgressModal();
+            startMkvPolling();
+        } else {
+            showAlert(res.message, "Errore");
+        }
+    } catch (e) {
+        showAlert("Errore: " + e.message, "Errore");
     }
 }
 
