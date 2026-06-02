@@ -183,6 +183,48 @@ async def admin_downloads_rename(request: Request):
         return {"status": "error", "message": f"Errore interno del server: {str(e)}"}
 
 
+@router.post("/admin/library/rename")
+async def admin_library_rename(request: Request):
+    """
+    Manually rename and organize a file that is already in the library.
+    """
+    from scanner.organizer import move_file
+    from pathlib import Path
+    
+    MEDIA_ROOT = Path("/media")
+    
+    try:
+        data = await request.json()
+        # In library, paths are already relative to /media or absolute starting with /media
+        raw_path = data["path"]
+        if raw_path.startswith("/media/"):
+            path = Path(raw_path)
+        else:
+            path = MEDIA_ROOT / raw_path
+            
+        if not path.exists():
+            return {"status": "error", "message": f"File not found at {path}"}
+        
+        success, result = move_file(
+            path,
+            is_series=data.get("is_series", False),
+            title=data.get("title"),
+            year=data.get("year"),
+            season=data.get("season"),
+            episode=data.get("episode"),
+            resolution=data.get("resolution")
+        )
+        
+        if success:
+            return {"status": "ok", "dest": result}
+        else:
+            return {"status": "error", "message": result}
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] Library rename crash: {traceback.format_exc()}")
+        return {"status": "error", "message": str(e)}
+
+
 @router.post("/admin/downloads/organize")
 def admin_downloads_organize(request: Request):
     """

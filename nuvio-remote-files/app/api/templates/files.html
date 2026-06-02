@@ -393,6 +393,42 @@
             transform: rotate(90deg);
         }
 
+        /* ── Colored Tags ── */
+        .tag-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-right: 4px;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .tag-res   { background: rgba(88,166,255,0.15); color: #58a6ff; border: 1px solid rgba(88,166,255,0.2); }
+        .tag-src   { background: rgba(63,185,80,0.15);  color: #3fb950; border: 1px solid rgba(63,185,80,0.2); }
+        .tag-codec { background: rgba(188,121,255,0.15); color: #bc79ff; border: 1px solid rgba(188,121,255,0.2); }
+        .tag-audio { background: rgba(210,153,34,0.15);  color: #d29922; border: 1px solid rgba(210,153,34,0.2); }
+        .tag-hdr   { background: rgba(247,129,102,0.15); color: #f78166; border: 1px solid rgba(247,129,102,0.2); }
+        .tag-other { background: rgba(139,148,158,0.15); color: #8b949e; border: 1px solid rgba(139,148,158,0.2); }
+
+        .btn-edit {
+            cursor: pointer;
+            color: var(--muted);
+            transition: color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            margin-right: 8px;
+            border-radius: 4px;
+            vertical-align: middle;
+        }
+        .btn-edit:hover {
+            color: var(--accent);
+            background: rgba(88,166,255,0.1);
+        }
+
         /* ── Modal ── */
         .modal-overlay {
             position: fixed;
@@ -640,9 +676,10 @@
         <table id="file-table" style="display:none">
             <thead>
                 <tr>
+                    <th style="width: 40px"></th>
                     <th data-col="type">Tipo<span class="sort-icon"></span></th>
                     <th data-col="title">Titolo / Percorso<span class="sort-icon"></span></th>
-                    <th data-col="resolution">Risoluzione<span class="sort-icon"></span></th>
+                    <th data-col="resolution">TAG<span class="sort-icon"></span></th>
                     <th data-col="size" class="sort-desc">Dimensione<span class="sort-icon"></span></th>
                 </tr>
             </thead>
@@ -735,6 +772,7 @@
             </div>
 
             <input type="hidden" id="rename-path">
+            <input type="hidden" id="rename-is-library" value="false">
 
             <div style="display: flex; justify-content: flex-end; gap: 12px;">
                 <button class="filter-btn" onclick="closeRenameModal()">Annulla</button>
@@ -1011,13 +1049,14 @@ async function organizeAllDownloads() {
 }
 
 // ── Manual Rename Logic ─────────────────────────────────────────────
-function openRenameModal(file) {
-    document.getElementById('rename-title').value = file.title || '';
-    document.getElementById('rename-is-series').checked = file.is_series;
+function openRenameModal(file, isLibrary = false) {
+    document.getElementById('rename-title').value = file.title || file.series_title || '';
+    document.getElementById('rename-is-series').checked = file.is_series || file.type === 'series';
     document.getElementById('rename-path').value = file.path;
-    document.getElementById('rename-res').value = file.resolution || '';
+    document.getElementById('rename-res').value = (file.resolution || '').replace(/[\[\]]/g, '');
+    document.getElementById('rename-is-library').value = isLibrary ? "true" : "false";
     
-    if (file.is_series) {
+    if (file.is_series || file.type === 'series') {
         document.getElementById('rename-year-season').value = file.season || '';
         document.getElementById('rename-episode').value = file.episode || '';
     } else {
@@ -1042,6 +1081,8 @@ function toggleRenameFields() {
 
 async function submitRename() {
     const isSeries = document.getElementById('rename-is-series').checked;
+    const isLibrary = document.getElementById('rename-is-library').value === "true";
+    
     const data = {
         path: document.getElementById('rename-path').value,
         is_series: isSeries,
@@ -1059,8 +1100,10 @@ async function submitRename() {
     
     if (!data.title) { showAlert("Il titolo è obbligatorio", "Attenzione"); return; }
     
+    const endpoint = isLibrary ? '/admin/library/rename' : '/admin/downloads/rename';
+    
     try {
-        const resp = await fetch(ingressPath + '/admin/downloads/rename', {
+        const resp = await fetch(ingressPath + endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -1069,7 +1112,12 @@ async function submitRename() {
         if (res.status === 'ok') {
             closeRenameModal();
             showAlert("File organizzato con successo!");
-            loadDownloads();
+            if (isLibrary) {
+                // If it's library, we need to rescannot to update the DB
+                manualScan();
+            } else {
+                loadDownloads();
+            }
         } else {
             showAlert("Errore: " + res.message, "Errore");
         }
@@ -1242,15 +1290,41 @@ function render() {
     });
 }
 
+function renderTags(tagString) {
+    if (!tagString) return '—';
+    // Remove brackets if present
+    const clean = tagString.replace(/[\[\]]/g, '').trim();
+    if (!clean) return '—';
+    
+    const tags = clean.split(/\s+/);
+    return tags.map(t => {
+        const lower = t.toLowerCase();
+        let cls = 'tag-other';
+        
+        if (/\b\d{3,4}p\b|\b[248]k\b|uhd|hd/i.test(lower)) cls = 'tag-res';
+        else if (/bluray|web|remux|rip|ts|cam|dvd/i.test(lower)) cls = 'tag-src';
+        else if (/x264|x265|hevc|avc|av1|xvid|divx/i.test(lower)) cls = 'tag-codec';
+        else if (/aac|ac3|dts|atmos|truehd|dd\+|e-ac3/i.test(lower)) cls = 'tag-audio';
+        else if (/hdr|dv|hlg/i.test(lower)) cls = 'tag-hdr';
+        
+        return `<span class="tag-pill ${cls}">${t}</span>`;
+    }).join('');
+}
+
+const PENCIL_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
+
 function renderMovieRow(file, tbody) {
     const tr = document.createElement('tr');
+    const editBtn = `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(file).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
+    
     tr.innerHTML = `
+        <td style="text-align: center">${editBtn}</td>
         <td><span class="badge movie">Film</span></td>
         <td>
             <div class="file-title">${escapeHtml(file.title || basename(file.path))}</div>
             <div class="file-path">${escapeHtml(file.path || '')}</div>
         </td>
-        <td>${file.resolution ? `<span class="res-badge">${escapeHtml(file.resolution)}</span>` : '—'}</td>
+        <td>${renderTags(file.resolution)}</td>
         <td class="size-cell">${formatSize(file.size)}</td>
     `;
     tbody.appendChild(tr);
@@ -1261,12 +1335,13 @@ function renderSeriesGroup(group, tbody) {
     const tr = document.createElement('tr');
     tr.className = 'group-row' + (expandedGroups.has(groupId) ? ' expanded' : '');
     tr.innerHTML = `
+        <td></td>
         <td><span class="badge series">Serie</span></td>
         <td>
             <div class="file-title"><span class="toggle-icon">▶</span>${escapeHtml(group.title)}</div>
             <div class="file-path">${group.count} episodi</div>
         </td>
-        <td>${group.commonRes ? `<span class="res-badge">${escapeHtml(group.commonRes)}</span>` : '—'}</td>
+        <td>${renderTags(group.commonRes)}</td>
         <td class="size-cell">${formatSize(group.size)}</td>
     `;
     tr.onclick = () => { if (expandedGroups.has(groupId)) expandedGroups.delete(groupId); else expandedGroups.add(groupId); render(); };
@@ -1281,8 +1356,9 @@ function renderSeriesGroup(group, tbody) {
             const sCommonRes = getCommonResolution(eps);
             sRow.innerHTML = `
                 <td></td>
+                <td></td>
                 <td><div class="file-title"><span class="toggle-icon">▶</span>Stagione ${seasonNum}</div></td>
-                <td>${sCommonRes ? `<span class="res-badge">${escapeHtml(sCommonRes)}</span>` : '—'}</td>
+                <td>${renderTags(sCommonRes)}</td>
                 <td class="size-cell">${formatSize(eps.reduce((s, f) => s + (f.size || 0), 0))}</td>
             `;
             sRow.onclick = (e) => { e.stopPropagation(); if (expandedGroups.has(seasonId)) expandedGroups.delete(seasonId); else expandedGroups.add(seasonId); render(); };
@@ -1291,10 +1367,13 @@ function renderSeriesGroup(group, tbody) {
                 eps.sort((a,b) => (a.episode || 0) - (b.episode || 0)).forEach(ep => {
                     const epRow = document.createElement('tr');
                     epRow.className = 'nested-row visible';
+                    const editBtn = `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(ep).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
+                    
                     epRow.innerHTML = `
+                        <td style="text-align: center; padding-left: 20px">${editBtn}</td>
                         <td></td>
                         <td class="indent"><div style="padding-left: 20px"><div class="file-title">Episodio ${ep.episode}</div><div class="file-path">${escapeHtml(ep.path)}</div></div></td>
-                        <td>${ep.resolution ? `<span class="res-badge">${escapeHtml(ep.resolution)}</span>` : '—'}</td>
+                        <td>${renderTags(ep.resolution)}</td>
                         <td class="size-cell">${formatSize(ep.size)}</td>
                     `;
                     tbody.appendChild(epRow);
