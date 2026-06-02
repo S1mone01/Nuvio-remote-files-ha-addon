@@ -143,13 +143,13 @@ def process_mkv_tracks(input_path: Path) -> Path:
         
         # Map video
         for idx in video_indices:
-            ffmpeg_cmd.extend(["map", f"0:{idx}"])
+            ffmpeg_cmd.extend(["-map", f"0:{idx}"])
         # Map Italian audio
         for idx in audio_indices:
-            ffmpeg_cmd.extend(["map", f"0:{idx}"])
+            ffmpeg_cmd.extend(["-map", f"0:{idx}"])
         # Map ALL subtitles
         for idx in subtitle_indices:
-            ffmpeg_cmd.extend(["map", f"0:{idx}"])
+            ffmpeg_cmd.extend(["-map", f"0:{idx}"])
             
         # Copy streams and preserve all metadata/chapters
         # -c copy : Pure bitstream copy, 100% original quality
