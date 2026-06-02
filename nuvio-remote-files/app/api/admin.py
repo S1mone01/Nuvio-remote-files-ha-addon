@@ -267,8 +267,8 @@ async def admin_debug_parse(request: Request):
                 ep_meta = lookup_episode(clean_meta.get("tmdb_id"), season, episode)
                 display_title = ep_meta["title"] if ep_meta and ep_meta.get("title") else clean_meta["title"]
                 tag_suffix = f" [{tags}]" if tags else ""
-                # Simulate extension from input or default to .mkv
-                ext = "".join(Path(filename).suffixes) or ".mkv"
+                # Get clean extension
+                ext = Path(filename).suffix or ".mkv"
                 final_filename = f"S{season:02d}E{episode:02d} {display_title}{tag_suffix}{ext}"
             else:
                 tmdb_status = "Not Found"
@@ -277,7 +277,8 @@ async def admin_debug_parse(request: Request):
             if clean_meta:
                 tmdb_status = "Found"
                 tag_suffix = f" [{tags}]" if tags else ""
-                ext = "".join(Path(filename).suffixes) or ".mkv"
+                # Get clean extension
+                ext = Path(filename).suffix or ".mkv"
                 final_filename = f"{clean_meta['title']} ({clean_meta['year']}){tag_suffix}{ext}"
             else:
                 tmdb_status = "Not Found"
