@@ -106,10 +106,12 @@ def api_files():
 def api_downloads():
     """
     JSON endpoint that scans the downloads directory and identifies
-    files that haven't been processed, marking unrecognized ones.
+    files that haven't been processed.
+    
+    Optimized: Removed slow TMDB lookups during initial listing to avoid hangs.
+    Identification is done on-demand or during actual organization.
     """
     from scanner.organizer import DOWNLOADS_ROOT, VIDEO_EXTENSIONS, parse_filename
-    from metadata.tmdb import lookup_movie, lookup_series
     
     files = []
     if DOWNLOADS_ROOT.exists():
@@ -122,16 +124,9 @@ def api_downloads():
             
             is_series, title, year, season, episode, resolution = parse_filename(path.name)
             
-            unrecognized = False
-            try:
-                if is_series:
-                    if not lookup_series(title):
-                        unrecognized = True
-                else:
-                    if not lookup_movie(title, year):
-                        unrecognized = True
-            except Exception:
-                unrecognized = True
+            # unrecognized is always False by default now to keep things fast.
+            # Identification happens when the user clicks "Identifica" or 
+            # when "Identifica Tutto" is clicked (which triggers organize_downloads)
             
             files.append({
                 "name": path.name,
@@ -142,7 +137,7 @@ def api_downloads():
                 "season": season,
                 "episode": episode,
                 "resolution": resolution,
-                "unrecognized": unrecognized,
+                "unrecognized": False,
                 "size": path.stat().st_size
             })
     
