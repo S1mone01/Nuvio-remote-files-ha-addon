@@ -10,7 +10,8 @@ RUN apk add --no-cache \
     py3-pip \
     curl \
     bash \
-    ffmpeg
+    ffmpeg \
+    mkvtoolnix
 
 # Set up workdir
 WORKDIR /app
