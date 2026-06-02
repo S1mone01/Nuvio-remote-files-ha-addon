@@ -929,6 +929,7 @@ let searchQuery  = '';
 let sortKey      = 'size';
 let sortDir      = 'desc';
 let expandedGroups = new Set();
+let seasonDataMap = new Map();
 
 const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
 
@@ -1246,7 +1247,12 @@ function closeRenameModal() {
 
 let currentSeasonData = null;
 
-function openSeasonTagModal(data) {
+function openSeasonTagModal(dataOrKey) {
+    let data = typeof dataOrKey === 'string' ? seasonDataMap.get(dataOrKey) : dataOrKey;
+    if (!data) {
+        console.error("Season data not found for:", dataOrKey);
+        return;
+    }
     currentSeasonData = data;
     document.getElementById('season-tag-info').textContent = `${data.series_title} - Stagione ${data.season}`;
     document.getElementById('season-tag-res').value = (data.resolution || '').replace(/[\[\]]/g, '');
@@ -1468,6 +1474,7 @@ function renderDownloads() {
     });
 }
 function render() {
+    seasonDataMap.clear();
     let rows = allFiles.slice();
     if (activeFilter !== 'all') {
         rows = rows.filter(f => f.type === activeFilter);
@@ -1612,8 +1619,17 @@ function renderSeriesGroup(group, tbody) {
             sRow.className = 'group-row indent' + (expandedGroups.has(seasonId) ? ' expanded' : '');
             const eps = group.seasons.get(seasonNum);
             const sCommonRes = getCommonResolution(eps);
-            const seasonData = { series_title: group.title, season: seasonNum, resolution: sCommonRes, episodes: eps.map(e => e.path) };
-            const seasonActions = `<span class="btn-edit" onclick='event.stopPropagation(); openSeasonTagModal(JSON.parse(atob("${btoa(JSON.stringify(seasonData))}"))) ' title="Modifica TAG Stagione">${PENCIL_SVG}</span>`;
+            
+            // Use a map to store data instead of passing complex objects in HTML attributes
+            const seasonDataKey = `data-${seasonId}`;
+            seasonDataMap.set(seasonDataKey, { 
+                series_title: group.title, 
+                season: seasonNum, 
+                resolution: sCommonRes, 
+                episodes: eps.map(e => e.path) 
+            });
+            
+            const seasonActions = `<span class="btn-edit" onclick="event.stopPropagation(); openSeasonTagModal('${seasonDataKey}')" title="Modifica TAG Stagione">${PENCIL_SVG}</span>`;
             sRow.innerHTML = `
                 <td style="text-align: center; white-space: nowrap;">${seasonActions}</td>
                 <td></td>
