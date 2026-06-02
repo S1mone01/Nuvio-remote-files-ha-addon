@@ -10,7 +10,8 @@ FILTERING_STATUS = {
     "total": 0,
     "processed": 0,
     "current_file": "",
-    "current_step": "", # New: Analisi, Filtraggio, etc.
+    "current_step": "",
+    "current_file_info": "", # New: track info (Kept/Removed)
     "last_error": None
 }
 
@@ -33,6 +34,8 @@ def process_mkv_tracks(input_path: Path) -> Path:
     try:
         # 1. Analyze with ffprobe
         FILTERING_STATUS["current_step"] = f"Analisi flussi..."
+        FILTERING_STATUS["current_file_info"] = ""
+        
         cmd = [
             "ffprobe", "-v", "error", "-show_entries",
             "stream=index,codec_type,disposition:stream_tags",
@@ -44,9 +47,11 @@ def process_mkv_tracks(input_path: Path) -> Path:
 
         video_indices = []
         audio_indices = []
-        subtitle_indices = [] # We will keep ALL subtitles
-        has_italian_audio = False
-        other_audio_languages_found = False
+        subtitle_indices = []
+        
+        detected_audio = []
+        kept_audio = []
+        removed_audio = []
 
         # Keywords to identify Italian tracks
         ita_keywords = ["ita", "it", "italiano", "italian", "it-it", "ita-it"]
@@ -55,22 +60,23 @@ def process_mkv_tracks(input_path: Path) -> Path:
             idx = s.get("index")
             ctype = s.get("codec_type")
             tags = s.get("tags", {})
+            lang = tags.get("language", "und").lower()
+            title = tags.get("title", "")
             
+            display_name = f"{lang}" + (f" ({title})" if title else "")
+
             if ctype == "video":
                 video_indices.append(idx)
             elif ctype == "subtitle":
-                # KEEP ALL SUBTITLES as per user request
                 subtitle_indices.append(idx)
             elif ctype == "audio":
-                # Check for Italian in tags
-                is_italian = False
+                detected_audio.append(display_name)
                 
-                # Check 'language' tag first (standard)
-                lang = tags.get("language", "").lower()
+                # Check for Italian
+                is_italian = False
                 if lang in ["ita", "it", "it-it", "ita-it"]:
                     is_italian = True
                 
-                # If not found in language, check title/name
                 if not is_italian:
                     for tag_val in tags.values():
                         val_lower = str(tag_val).lower()
@@ -80,43 +86,51 @@ def process_mkv_tracks(input_path: Path) -> Path:
                 
                 if is_italian:
                     audio_indices.append(idx)
-                    has_italian_audio = True
+                    kept_audio.append(display_name)
                 else:
-                    other_audio_languages_found = True
+                    removed_audio.append(display_name)
 
-        # 2. Skip if no Italian audio found (Safety: don't leave file without audio)
-        if not has_italian_audio:
+        # Update info for UI
+        info_parts = []
+        if detected_audio:
+            info_parts.append(f"Audio rilevati: {', '.join(detected_audio)}")
+        if removed_audio:
+            info_parts.append(f"Mantenuti: {', '.join(kept_audio)}")
+            info_parts.append(f"Rimossi: {', '.join(removed_audio)}")
+        else:
+            info_parts.append("Solo tracce italiane rilevate, filtraggio non necessario.")
+        
+        FILTERING_STATUS["current_file_info"] = " | ".join(info_parts)
+
+        # 2. Skip if no Italian audio found
+        if not audio_indices:
             print(f"[FFMPEG] No Italian audio found in {input_path.name}, skipping to preserve existing tracks.")
+            FILTERING_STATUS["current_file_info"] = "Nessun audio italiano trovato. File saltato per sicurezza."
             return input_path
 
-        # 3. Skip if no other audio languages found (nothing to filter in audio)
-        # and since we keep all subtitles, there's nothing else to filter.
-        if not other_audio_languages_found:
+        # 3. Skip if nothing to filter (only Italian audio already)
+        if not removed_audio:
             return input_path
 
         # 4. Filter with ffmpeg
         FILTERING_STATUS["current_step"] = f"Filtraggio tracce (copia)..."
         temp_output = input_path.with_suffix(".tmp.mkv")
         
-        ffmpeg_cmd = ["ffmpeg", "-y", "-i", str(input_path)]
+        # -nostdin: prevents hangs in background
+        # -loglevel error: minimal output to avoid pipe issues
+        ffmpeg_cmd = ["ffmpeg", "-nostdin", "-y", "-loglevel", "error", "-i", str(input_path)]
         
-        # Map video
         for idx in video_indices:
             ffmpeg_cmd.extend(["-map", f"0:{idx}"])
-        
-        # Map ONLY Italian audio
         for idx in audio_indices:
             ffmpeg_cmd.extend(["-map", f"0:{idx}"])
-            
-        # Map ALL subtitles
         for idx in subtitle_indices:
             ffmpeg_cmd.extend(["-map", f"0:{idx}"])
             
-        # Preserve all metadata, chapters, etc.
         ffmpeg_cmd.extend(["-map_metadata", "0", "-map_chapters", "0", "-c", "copy"])
         ffmpeg_cmd.append(str(temp_output))
         
-        # Final safety check: must have at least one audio and one video
+        # Final safety check
         if not audio_indices or not video_indices:
              return input_path
 
@@ -134,7 +148,6 @@ def process_mkv_tracks(input_path: Path) -> Path:
         err_msg = e.stderr.decode() if e.stderr else str(e)
         print(f"[FFMPEG] [ERROR] FFmpeg failed for {input_path.name}: {err_msg}")
         FILTERING_STATUS["last_error"] = f"Errore su {input_path.name}: {err_msg[:100]}..."
-        # Cleanup temp file
         temp_output = input_path.with_suffix(".tmp.mkv")
         if temp_output.exists():
             try: os.remove(temp_output)
@@ -159,6 +172,7 @@ def filter_existing_library():
     FILTERING_STATUS["total"] = 0
     FILTERING_STATUS["current_file"] = ""
     FILTERING_STATUS["current_step"] = "Scansione libreria..."
+    FILTERING_STATUS["current_file_info"] = ""
     FILTERING_STATUS["last_error"] = None
 
     try:
@@ -182,4 +196,4 @@ def filter_existing_library():
         FILTERING_STATUS["is_running"] = False
         FILTERING_STATUS["current_file"] = ""
         FILTERING_STATUS["current_step"] = "Completato"
-
+        FILTERING_STATUS["current_file_info"] = ""

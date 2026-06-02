@@ -800,9 +800,19 @@
                 <div style="width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
                     <div id="mkv-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s;"></div>
                 </div>
+                <div style="font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;">
+                    Stato: <span id="mkv-current-step" style="color: var(--accent);">—</span>
+                </div>
                 <div style="font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     File attuale: <span id="mkv-current-file" style="color: var(--text);">—</span>
                 </div>
+                <div id="mkv-file-info-box" style="margin-top: 10px; font-size: 0.7rem; color: var(--muted); background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; display: none;">
+                    <span id="mkv-current-file-info"></span>
+                </div>
+            </div>
+
+            <div id="mkv-error-box" style="display: none; background: rgba(220, 38, 38, 0.1); border: 1px solid var(--warn); border-radius: 8px; padding: 10px; margin-bottom: 20px; font-size: 0.75rem; color: var(--warn);">
+                <strong>Ultimo errore:</strong> <span id="mkv-error-text"></span>
             </div>
 
             <p style="font-size: 0.8rem; color: var(--muted);">Questo processo avviene in background. Puoi chiudere questa finestra, il filtraggio continuerà comunque.</p>
@@ -1470,6 +1480,9 @@ function startMkvPolling() {
                 const processed = status.processed;
                 const total = status.total;
                 const current = status.current_file;
+                const step = status.current_step;
+                const info = status.current_file_info;
+                const error = status.last_error;
                 
                 const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
                 
@@ -1477,6 +1490,21 @@ function startMkvPolling() {
                 document.getElementById('mkv-progress-percent').textContent = `${percent}%`;
                 document.getElementById('mkv-progress-bar').style.width = `${percent}%`;
                 document.getElementById('mkv-current-file').textContent = current || '—';
+                document.getElementById('mkv-current-step').textContent = step || '—';
+
+                if (info) {
+                    document.getElementById('mkv-file-info-box').style.display = 'block';
+                    document.getElementById('mkv-current-file-info').textContent = info;
+                } else {
+                    document.getElementById('mkv-file-info-box').style.display = 'none';
+                }
+
+                if (error) {
+                    document.getElementById('mkv-error-box').style.display = 'block';
+                    document.getElementById('mkv-error-text').textContent = error;
+                } else {
+                    document.getElementById('mkv-error-box').style.display = 'none';
+                }
             } else {
                 clearInterval(mkvPollingInterval);
                 mkvPollingInterval = null;
@@ -1485,6 +1513,7 @@ function startMkvPolling() {
                 document.getElementById('mkv-progress-text').textContent = `Completato!`;
                 document.getElementById('mkv-progress-percent').textContent = `100%`;
                 document.getElementById('mkv-progress-bar').style.width = `100%`;
+                document.getElementById('mkv-current-step').textContent = 'Finito';
                 document.getElementById('mkv-current-file').textContent = "Operazione terminata.";
                 
                 // Refresh library to see if sizes changed
