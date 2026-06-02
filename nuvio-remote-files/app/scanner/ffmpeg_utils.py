@@ -103,16 +103,16 @@ def process_mkv_tracks(input_path: Path) -> Path:
         
         temp_output = input_path.with_suffix(".tmp.mkv")
         
-        # mkvmerge command
+        # mkvmerge command construction
+        # Order: [global options] -o [output] [track options] [input]
         cmd_merge = [
             "mkvmerge",
             "-o", str(temp_output),
             "--audio-languages", "ita,it",
-            "--subtitle-languages", "all",
+            "--subtitle-languages", "all"
         ]
         
         if first_ita_audio_id is not None:
-            # mkvmerge uses track IDs from its own identification for flags
             cmd_merge.extend(["--default-track-flag", f"{first_ita_audio_id}:1"])
             
         cmd_merge.append(str(input_path))
