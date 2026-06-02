@@ -24,6 +24,7 @@ def _tmdb_get(path, params=None):
         params = {}
 
     params["api_key"] = TMDB_API_KEY
+    params["language"] = "it-IT"  # Force Italian titles
 
     try:
         resp = requests.get(
