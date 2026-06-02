@@ -1636,6 +1636,12 @@ function openMkvProgressModal() {
 
 function closeMkvProgressModal() {
     document.getElementById('mkv-progress-modal-overlay').style.display = 'none';
+    // Ensure we reset filter to 'all' to avoid empty views
+    activeFilter = 'all';
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === 'all');
+    });
+    render();
 }
 
 function startMkvPolling() {
@@ -1688,6 +1694,8 @@ function startMkvPolling() {
                 
                 // Refresh library to see if sizes changed
                 loadFiles();
+                // Trigger a scan automatically to update the database
+                manualScan();
             }
         } catch (e) {
             console.error("Polling error:", e);
