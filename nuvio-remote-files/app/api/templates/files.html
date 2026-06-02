@@ -1268,6 +1268,11 @@ async function submitSeasonTags() {
     if (!currentSeasonData) return;
     
     const newRes = document.getElementById('season-tag-res').value.trim();
+    const seasonData = {
+        series_title: currentSeasonData.series_title,
+        season: currentSeasonData.season,
+        episodes: currentSeasonData.episodes
+    };
     
     closeSeasonTagModal();
     
@@ -1276,10 +1281,10 @@ async function submitSeasonTags() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                series_title: currentSeasonData.series_title,
-                season: currentSeasonData.season,
+                series_title: seasonData.series_title,
+                season: seasonData.season,
                 resolution: newRes,
-                paths: currentSeasonData.episodes
+                paths: seasonData.episodes
             })
         });
         const res = await resp.json();
