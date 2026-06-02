@@ -128,6 +128,10 @@ def process_mkv_tracks(input_path: Path) -> Path:
             ffmpeg_cmd.extend(["-map", f"0:{idx}"])
             
         ffmpeg_cmd.extend(["-map_metadata", "0", "-map_chapters", "0", "-c", "copy"])
+        
+        # Force Italian audio as default and forced for better player compatibility
+        ffmpeg_cmd.extend(["-disposition:a:0", "default+forced"])
+        
         ffmpeg_cmd.append(str(temp_output))
         
         # Final safety check
