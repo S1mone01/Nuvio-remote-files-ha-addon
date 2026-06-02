@@ -141,7 +141,12 @@ def process_mkv_tracks(input_path: Path) -> Path:
             ffmpeg_cmd.extend(["-map", f"0:{idx}"])
             
         # Copy streams and preserve all metadata/chapters
-        ffmpeg_cmd.extend(["-c", "copy", "-map_metadata", "0", "-map_chapters", "0"])
+        # -c copy : Pure bitstream copy, 100% original quality
+        ffmpeg_cmd.extend([
+            "-c", "copy",
+            "-map_metadata", "0",
+            "-map_chapters", "0"
+        ])
         
         # Force Italian audio as default and forced
         ffmpeg_cmd.extend(["-disposition:a:0", "default+forced"])
