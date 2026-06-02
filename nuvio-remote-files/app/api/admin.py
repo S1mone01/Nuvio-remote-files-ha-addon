@@ -336,6 +336,61 @@ def admin_library_filter_mkv_status():
     return FILTERING_STATUS
 
 
+@router.post("/admin/file/tracks")
+async def admin_file_tracks(request: Request):
+    """
+    Get MKV track info for a specific file.
+    """
+    from scanner.mkv_utils import get_mkv_tracks
+    from scanner.organizer import DOWNLOADS_ROOT, MEDIA_ROOT
+    
+    try:
+        data = await request.json()
+        file_path_str = data.get("path")
+        is_library = data.get("is_library", False)
+        
+        if is_library:
+            if file_path_str.startswith("/media/"):
+                path = Path(file_path_str)
+            else:
+                path = MEDIA_ROOT / file_path_str
+        else:
+            path = DOWNLOADS_ROOT / file_path_str
+            
+        tracks = get_mkv_tracks(path)
+        return {"status": "ok", "tracks": tracks}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@router.post("/admin/file/tracks/update")
+async def admin_file_tracks_update(request: Request):
+    """
+    Update MKV track metadata for a specific file.
+    """
+    from scanner.mkv_utils import update_mkv_metadata
+    from scanner.organizer import DOWNLOADS_ROOT, MEDIA_ROOT
+    
+    try:
+        data = await request.json()
+        file_path_str = data.get("path")
+        is_library = data.get("is_library", False)
+        updates = data.get("updates", [])
+        
+        if is_library:
+            if file_path_str.startswith("/media/"):
+                path = Path(file_path_str)
+            else:
+                path = MEDIA_ROOT / file_path_str
+        else:
+            path = DOWNLOADS_ROOT / file_path_str
+            
+        success, message = update_mkv_metadata(path, updates)
+        return {"status": "ok" if success else "error", "message": message}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 # ── Admin pages ──────────────────────────────────────────────────────
 
 # These pages are intentionally unauthenticated.

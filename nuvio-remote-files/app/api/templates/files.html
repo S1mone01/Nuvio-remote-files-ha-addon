@@ -772,6 +772,13 @@
                 </label>
             </div>
 
+            <div id="mkv-tracks-section" style="display: none; border-top: 1px solid var(--border); padding-top: 20px; margin-top: 20px; margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 12px; font-weight: 600; color: var(--accent); font-size: 0.85rem;">Metadati Tracce MKV</label>
+                <div id="mkv-tracks-list" style="max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 5px; border: 1px solid var(--border);">
+                    <div style="text-align: center; color: var(--muted); padding: 20px; font-size: 0.8rem;">Caricamento tracce...</div>
+                </div>
+            </div>
+
             <input type="hidden" id="rename-path">
             <input type="hidden" id="rename-is-library" value="false">
 
@@ -1090,7 +1097,9 @@ async function organizeAllDownloads() {
 }
 
 // ── Manual Rename Logic ─────────────────────────────────────────────
-function openRenameModal(file, isLibrary = false) {
+let currentTracks = [];
+
+async function openRenameModal(file, isLibrary = false) {
     document.getElementById('rename-title').value = file.title || file.series_title || '';
     document.getElementById('rename-is-series').checked = file.is_series || file.type === 'series';
     document.getElementById('rename-path').value = file.path;
@@ -1106,7 +1115,84 @@ function openRenameModal(file, isLibrary = false) {
     }
     
     toggleRenameFields();
+
+    // MKV Tracks
+    const tracksSection = document.getElementById('mkv-tracks-section');
+    const tracksList = document.getElementById('mkv-tracks-list');
+    currentTracks = [];
+    
+    if (file.path.toLowerCase().endsWith('.mkv')) {
+        tracksSection.style.display = 'block';
+        tracksList.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 20px; font-size: 0.8rem;">Caricamento tracce...</div>';
+        
+        try {
+            const resp = await fetch(ingressPath + '/admin/file/tracks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: file.path, is_library: isLibrary })
+            });
+            const data = await resp.json();
+            if (data.status === 'ok' && data.tracks && data.tracks.length > 0) {
+                renderTracks(data.tracks);
+            } else {
+                tracksList.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 20px; font-size: 0.8rem;">Nessuna traccia rilevata o errore.</div>';
+            }
+        } catch (e) {
+            tracksList.innerHTML = '<div style="text-align: center; color: var(--warn); padding: 20px; font-size: 0.8rem;">Errore caricamento tracce.</div>';
+        }
+    } else {
+        tracksSection.style.display = 'none';
+    }
+
     document.getElementById('rename-modal-overlay').style.display = 'flex';
+}
+
+function renderTracks(tracks) {
+    currentTracks = tracks;
+    const list = document.getElementById('mkv-tracks-list');
+    list.innerHTML = '';
+    
+    tracks.forEach((t, i) => {
+        const div = document.createElement('div');
+        div.style.cssText = "display: flex; flex-direction: column; gap: 8px; padding: 10px; border-bottom: 1px solid var(--border);";
+        if (i === tracks.length - 1) div.style.borderBottom = 'none';
+        
+        const typeIcon = t.type === 'audio' ? '🎵' : (t.type === 'video' ? '📺' : '💬');
+        const typeLabel = t.type === 'audio' ? 'Audio' : (t.type === 'video' ? 'Video' : 'Sottotitolo');
+        
+        div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.72rem; color: var(--muted); font-weight: 600; font-family: 'JetBrains Mono', monospace;">
+                    ${typeIcon} #${t.id} ${typeLabel} (${t.codec})
+                </span>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label style="font-size: 0.65rem; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                        <input type="checkbox" ${t.is_default ? 'checked' : ''} onchange="updateTrackLocal(${t.id}, 'is_default', this.checked)" style="width: 12px; height: 12px;"> DEF
+                    </label>
+                    <label style="font-size: 0.65rem; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                        <input type="checkbox" ${t.is_forced ? 'checked' : ''} onchange="updateTrackLocal(${t.id}, 'is_forced', this.checked)" style="width: 12px; height: 12px;"> FORC
+                    </label>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" value="${escapeHtml(t.language)}" placeholder="ita" title="Lingua" 
+                    style="width: 50px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 6px; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;" 
+                    onchange="updateTrackLocal(${t.id}, 'language', this.value)">
+                <input type="text" value="${escapeHtml(t.title)}" placeholder="Titolo traccia" title="Titolo traccia"
+                    style="flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 6px; font-size: 0.75rem;" 
+                    onchange="updateTrackLocal(${t.id}, 'title', this.value)">
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+function updateTrackLocal(id, field, value) {
+    const track = currentTracks.find(t => t.id === id);
+    if (track) {
+        track[field] = value;
+        track.dirty = true;
+    }
 }
 
 function closeRenameModal() {
@@ -1123,9 +1209,34 @@ function toggleRenameFields() {
 async function submitRename() {
     const isSeries = document.getElementById('rename-is-series').checked;
     const isLibrary = document.getElementById('rename-is-library').value === "true";
+    const path = document.getElementById('rename-path').value;
     
+    // 1. If MKV tracks were modified, update them first
+    const dirtyTracks = currentTracks.filter(t => t.dirty);
+    if (dirtyTracks.length > 0) {
+        try {
+            const trackResp = await fetch(ingressPath + '/admin/file/tracks/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    path: path, 
+                    is_library: isLibrary,
+                    updates: dirtyTracks
+                })
+            });
+            const trackRes = await trackResp.json();
+            if (trackRes.status !== 'ok') {
+                console.error("Errore aggiornamento tracce:", trackRes.message);
+                // We continue anyway, but maybe log it
+            }
+        } catch (e) {
+            console.error("Errore connessione aggiornamento tracce:", e);
+        }
+    }
+
+    // 2. Perform regular rename/move
     const data = {
-        path: document.getElementById('rename-path').value,
+        path: path,
         is_series: isSeries,
         title: document.getElementById('rename-title').value.trim(),
         resolution: document.getElementById('rename-res').value
