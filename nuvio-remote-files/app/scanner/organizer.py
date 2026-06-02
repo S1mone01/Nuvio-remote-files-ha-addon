@@ -28,6 +28,17 @@ DOWNLOADS_ROOT = MEDIA_ROOT / DOWNLOADS_DIR_NAME
 # Video extensions to process
 VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".wmv"}
 
+def get_clean_stem(filename: str) -> tuple[str, str]:
+    """
+    Safely split filename into stem and extension by checking against known video extensions.
+    This prevents messy filenames with dots (but no extension) from being split incorrectly.
+    """
+    lower_name = filename.lower()
+    for ext in VIDEO_EXTENSIONS:
+        if lower_name.endswith(ext):
+            return filename[:-len(ext)], ext
+    return filename, ""
+
 # Regex patterns
 EPISODE_PATTERN = re.compile(r"S(?P<season>\d{1,2})E(?P<episode>\d{1,2})", re.IGNORECASE)
 ALT_EPISODE_PATTERN = re.compile(r"(?P<season>\d{1,2})x(?P<episode>\d{1,2})", re.IGNORECASE)
@@ -41,7 +52,7 @@ def parse_filename(filename: str):
     Parse a messy filename to extract title and metadata.
     Returns (is_series, title, year, season, episode, tags_string)
     """
-    stem = Path(filename).stem
+    stem, _ = get_clean_stem(filename)
     
     # Use centralized tag extraction
     tags_string = extract_tags(stem)

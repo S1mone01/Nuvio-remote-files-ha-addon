@@ -239,7 +239,7 @@ async def admin_debug_parse(request: Request):
     """
     Debug endpoint to test how a filename will be parsed and if it's compatible with Stremio.
     """
-    from scanner.organizer import parse_filename
+    from scanner.organizer import parse_filename, get_clean_stem
     from scanner.scan_series import parse_episode_filename
     from metadata.tmdb import lookup_movie, lookup_series
     from scanner.organizer import smart_lookup_series
@@ -259,6 +259,11 @@ async def admin_debug_parse(request: Request):
         clean_meta = None
         final_filename = "N/D"
         
+        # Get clean extension safely
+        _, ext = get_clean_stem(filename)
+        if not ext:
+            ext = ".mkv" # Fallback for preview
+        
         if is_series:
             clean_meta = smart_lookup_series(title)
             if clean_meta:
@@ -267,8 +272,6 @@ async def admin_debug_parse(request: Request):
                 ep_meta = lookup_episode(clean_meta.get("tmdb_id"), season, episode)
                 display_title = ep_meta["title"] if ep_meta and ep_meta.get("title") else clean_meta["title"]
                 tag_suffix = f" [{tags}]" if tags else ""
-                # Get clean extension
-                ext = Path(filename).suffix or ".mkv"
                 final_filename = f"S{season:02d}E{episode:02d} {display_title}{tag_suffix}{ext}"
             else:
                 tmdb_status = "Not Found"
@@ -277,8 +280,6 @@ async def admin_debug_parse(request: Request):
             if clean_meta:
                 tmdb_status = "Found"
                 tag_suffix = f" [{tags}]" if tags else ""
-                # Get clean extension
-                ext = Path(filename).suffix or ".mkv"
                 final_filename = f"{clean_meta['title']} ({clean_meta['year']}){tag_suffix}{ext}"
             else:
                 tmdb_status = "Not Found"
@@ -286,7 +287,14 @@ async def admin_debug_parse(request: Request):
         # 2. Test Scanner/Stremio Compatibility (Clean/Structured -> DB/Stremio)
         # This checks if the SxEx pattern is found for Stremio matching
         scanner_result = parse_episode_filename(filename)
-        stremio_compatible = scanner_result is not None
+        
+        if is_series:
+            stremio_compatible = scanner_result is not None
+            note = "Stremio richiede un pattern SxEx chiaro (es. S01E01) per riconoscere gli episodi."
+        else:
+            # Movies are always compatible if they have a clear title/year
+            stremio_compatible = title is not None
+            note = "I film vengono riconosciuti automaticamente tramite titolo e anno."
         
         return {
             "status": "ok",
@@ -303,8 +311,8 @@ async def admin_debug_parse(request: Request):
             },
             "stremio": {
                 "compatible": stremio_compatible,
-                "parsed": scanner_result if stremio_compatible else None,
-                "note": "Stremio requires a clear SxEx pattern to match episodes." if is_series else "Movies match by title/year."
+                "parsed": scanner_result if (is_series and stremio_compatible) else None,
+                "note": note
             }
         }
     except Exception as e:
