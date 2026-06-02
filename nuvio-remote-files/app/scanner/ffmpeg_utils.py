@@ -22,15 +22,15 @@ SERIES_ROOT = MEDIA_ROOT / SERIES_DIR_NAME
 
 def check_requirements():
     """Check if necessary tools are installed."""
-    for tool in ["mkvmerge", "ffprobe"]:
+    for tool in ["ffmpeg", "ffprobe"]:
         if not shutil.which(tool):
             return False, f"Strumento '{tool}' non trovato. Assicurati di aver ricostruito l'addon (Rebuild)."
     return True, None
 
 def process_mkv_tracks(input_path: Path) -> Path:
     """
-    Physically remove non-Italian audio tracks to recover space.
-    Uses mkvmerge for maximum speed and compatibility.
+    Filter MKV tracks to keep only Italian audio using ffmpeg.
+    Physically removes other audio tracks to recover space.
     """
     global FILTERING_STATUS
     
@@ -41,110 +41,135 @@ def process_mkv_tracks(input_path: Path) -> Path:
         return input_path
 
     try:
-        # 1. Analyze with mkvmerge -J (more accurate for mkvmerge than ffprobe)
+        # 1. Analyze with ffprobe
         FILTERING_STATUS["current_step"] = f"Analisi flussi..."
+        FILTERING_STATUS["current_file_info"] = ""
         
-        cmd_probe = ["mkvmerge", "-J", str(input_path)]
+        cmd_probe = [
+            "ffprobe", "-v", "error", "-show_entries",
+            "stream=index,codec_type,disposition:stream_tags",
+            "-of", "json", str(input_path)
+        ]
         result = subprocess.run(cmd_probe, capture_output=True, text=True, check=True)
         data = json.loads(result.stdout)
-        tracks = data.get("tracks", [])
+        streams = data.get("streams", [])
 
-        has_italian_audio = False
-        other_audio_found = False
+        video_indices = []
+        audio_indices = []
+        subtitle_indices = []
+        
         detected_audio = []
-        first_ita_audio_id = None
+        kept_audio = []
+        removed_audio = []
 
         # Keywords to identify Italian tracks
         ita_keywords = ["ita", "it", "italiano", "italian", "it-it", "ita-it"]
 
-        for t in tracks:
-            t_id = t.get("id")
-            t_type = t.get("type")
-            if t_type != "audio":
-                continue
+        for s in streams:
+            idx = s.get("index")
+            ctype = s.get("codec_type")
+            tags = s.get("tags", {})
+            lang = tags.get("language", "und").lower()
+            title = tags.get("title", "")
             
-            props = t.get("properties", {})
-            lang = props.get("language", "und").lower()
-            title = props.get("track_name", "")
             display_name = f"{lang}" + (f" ({title})" if title else "")
-            detected_audio.append(display_name)
 
-            # Check for Italian
-            is_italian = False
-            if lang in ["ita", "it", "it-it", "ita-it"]:
-                is_italian = True
-            if not is_italian:
-                # Check title/name
-                for val in [lang, title]:
-                    val_lower = str(val).lower()
-                    if any(k in val_lower for k in ["italiano", "italian"]):
-                        is_italian = True
-                        break
-            
-            if is_italian:
-                has_italian_audio = True
-                if first_ita_audio_id is None:
-                    first_ita_audio_id = t_id
-            else:
-                other_audio_found = True
+            if ctype == "video":
+                video_indices.append(idx)
+            elif ctype == "subtitle":
+                # KEEP ALL SUBTITLES
+                subtitle_indices.append(idx)
+            elif ctype == "audio":
+                detected_audio.append(display_name)
+                
+                # Check for Italian
+                is_italian = False
+                if lang in ["ita", "it", "it-it", "ita-it"]:
+                    is_italian = True
+                
+                if not is_italian:
+                    for tag_val in tags.values():
+                        val_lower = str(tag_val).lower()
+                        if any(k in val_lower for k in ["italiano", "italian"]):
+                            is_italian = True
+                            break
+                
+                if is_italian:
+                    audio_indices.append(idx)
+                    kept_audio.append(display_name)
+                else:
+                    removed_audio.append(display_name)
 
-        # 2. Skip logic
-        if not has_italian_audio:
-            FILTERING_STATUS["current_file_info"] = "Nessun audio italiano trovato. Saltato."
-            return input_path
-
-        if not other_audio_found:
-            FILTERING_STATUS["current_file_info"] = "Già filtrato (solo audio ITA). Saltato."
-            return input_path
-
-        # 3. Physical cleanup with mkvmerge
-        FILTERING_STATUS["current_step"] = f"Pulizia fisica (Recupero spazio)..."
-        FILTERING_STATUS["current_file_info"] = f"Rilevati: {', '.join(detected_audio)} | Pulizia in corso..."
+        # Update info for UI
+        info_parts = []
+        if detected_audio:
+            info_parts.append(f"Audio rilevati: {', '.join(detected_audio)}")
         
+        if removed_audio:
+            info_parts.append(f"Mantenuti: {', '.join(kept_audio)}")
+            info_parts.append(f"Rimossi: {', '.join(removed_audio)}")
+        else:
+            info_parts.append("Solo tracce italiane rilevate, filtraggio non necessario.")
+        
+        FILTERING_STATUS["current_file_info"] = " | ".join(info_parts)
+
+        # 2. Skip if no Italian audio found (Safety)
+        if not audio_indices:
+            FILTERING_STATUS["current_file_info"] = "Nessun audio italiano trovato. Saltato per sicurezza."
+            return input_path
+
+        # 3. Skip if nothing to filter
+        if not removed_audio:
+            return input_path
+
+        # 4. Filter with ffmpeg
+        FILTERING_STATUS["current_step"] = f"Pulizia fisica (ffmpeg)..."
         temp_output = input_path.with_suffix(".tmp.mkv")
         
-        # mkvmerge command construction
-        # Order: [global options] -o [output] [track options] [input]
-        cmd_merge = [
-            "mkvmerge",
-            "-o", str(temp_output),
-            "--audio-languages", "ita,it",
-            "--subtitle-languages", "all"
-        ]
+        # -nostdin: prevents hangs in background
+        # -loglevel error: minimal output
+        ffmpeg_cmd = ["ffmpeg", "-nostdin", "-y", "-loglevel", "error", "-i", str(input_path)]
         
-        if first_ita_audio_id is not None:
-            cmd_merge.extend(["--default-track-flag", f"{first_ita_audio_id}:1"])
+        # Map video
+        for idx in video_indices:
+            ffmpeg_cmd.extend(["-map", f"0:{idx}"])
+        # Map Italian audio
+        for idx in audio_indices:
+            ffmpeg_cmd.extend(["-map", f"0:{idx}"])
+        # Map ALL subtitles
+        for idx in subtitle_indices:
+            ffmpeg_cmd.extend(["-map", f"0:{idx}"])
             
-        cmd_merge.append(str(input_path))
+        # Copy streams and preserve all metadata/chapters
+        ffmpeg_cmd.extend(["-c", "copy", "-map_metadata", "0", "-map_chapters", "0"])
         
-        # Run mkvmerge and capture both stdout/stderr for better error reporting
-        result = subprocess.run(cmd_merge, capture_output=True, text=True)
+        # Force Italian audio as default and forced
+        ffmpeg_cmd.extend(["-disposition:a:0", "default+forced"])
         
-        if result.returncode not in [0, 1]:
-            # If failed, use whatever info we have (stderr or stdout)
-            error_msg = result.stderr.strip() or result.stdout.strip() or "Errore sconosciuto"
+        ffmpeg_cmd.append(str(temp_output))
+        
+        # Run ffmpeg
+        result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() or "Errore sconosciuto ffmpeg"
             raise Exception(error_msg)
 
-        # 4. Replace original safely
+        # 5. Replace original safely
         FILTERING_STATUS["current_step"] = f"Salvataggio file..."
         if temp_output.exists() and temp_output.stat().st_size > 0:
             old_size = input_path.stat().st_size
             new_size = temp_output.stat().st_size
             saved = (old_size - new_size) / (1024 * 1024)
             
-            try:
-                os.remove(input_path)
-                temp_output.rename(input_path)
-                FILTERING_STATUS["current_file_info"] = f"Fatto! Recuperati {saved:.1f} MB"
-            except Exception as e:
-                raise Exception(f"Impossibile sostituire il file sul NAS: {str(e)}")
-        else:
-             raise Exception("Il file di output non è stato creato o è vuoto.")
+            os.remove(input_path)
+            temp_output.rename(input_path)
+            FILTERING_STATUS["current_file_info"] = f"Completato! Recuperati {saved:.1f} MB"
         
         return input_path
 
     except Exception as e:
-        print(f"[MKVMERGE] [ERROR] Failed to process {input_path.name}: {e}")
+        print(f"[FFMPEG] [ERROR] Failed to process {input_path.name}: {e}")
         FILTERING_STATUS["last_error"] = f"Errore su {input_path.name}: {str(e)[:150]}"
         temp_output = input_path.with_suffix(".tmp.mkv")
         if temp_output.exists():
@@ -170,7 +195,6 @@ def filter_existing_library():
     FILTERING_STATUS["last_error"] = None
 
     try:
-        # Check tools first
         ok, err = check_requirements()
         if not ok:
             FILTERING_STATUS["last_error"] = err
@@ -190,7 +214,7 @@ def filter_existing_library():
             FILTERING_STATUS["processed"] += 1
             
     except Exception as e:
-        print(f"[MKVMERGE] [ERROR] Library filtering failed: {e}")
+        print(f"[FFMPEG] [ERROR] Library filtering failed: {e}")
         FILTERING_STATUS["last_error"] = f"Errore critico: {str(e)}"
     finally:
         FILTERING_STATUS["is_running"] = False
