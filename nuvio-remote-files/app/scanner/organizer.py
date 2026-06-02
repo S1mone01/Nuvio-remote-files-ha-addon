@@ -31,12 +31,17 @@ VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".wmv"}
 
 def process_mkv_if_enabled(path: Path):
     """Filter MKV tracks if the option is enabled."""
+    print(f"[ORGANIZE] Checking MKV filter for {path.name} (Enabled: {FILTER_MKV_TRACKS})")
     if FILTER_MKV_TRACKS and path.suffix.lower() == ".mkv":
         try:
+            print(f"[ORGANIZE] Filtering tracks for {path.name}...")
             from scanner.ffmpeg_utils import process_mkv_tracks
             process_mkv_tracks(path)
+            print(f"[ORGANIZE] Filtering complete for {path.name}")
         except Exception as e:
             print(f"[ORGANIZE] [ERROR] Failed to filter MKV {path.name}: {e}")
+    elif not FILTER_MKV_TRACKS:
+        print(f"[ORGANIZE] MKV filter is DISABLED in configuration.")
 
 def get_clean_stem(filename: str) -> tuple[str, str]:
     """
