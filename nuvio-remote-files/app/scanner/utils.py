@@ -9,13 +9,13 @@ TAGS_LIST = [
     # Resolutions
     "480p", "576p", "720p", "1080p", "1440p", "2160p", "4320p", "4K", "8K", "UHD", "HD",
     # Codecs
-    "XviD", "DivX", "x264", "H\.264", "AVC", "x265", "H\.265", "HEVC", "AV1",
+    "XviD", "DivX", "x264", r"H\.264", "H264", "AVC", "x265", r"H\.265", "H265", "HEVC", "AV1", "10bit",
     # HDR
-    "HDR10", "HDR10\+", "Dolby Vision", "DV", "HLG",
+    "HDR10", r"HDR10\+", "Dolby Vision", "DV", "HLG", "HDR",
     # Audio
     "AAC", "AC3", "Dolby Digital", "E-AC3", "DTS", "DTS-HD MA", "Dolby TrueHD", "Dolby Atmos",
     # Common Tags
-    "DUBBED", "5\.1", "7\.1"
+    "DUBBED", r"5\.1", r"7\.1", "IMAX", "PROPER", "REPACK", "INTERNAL", "EXTENDED", "UNRATED", "DIRECTORS CUT", "3D"
 ]
 
 TAGS_PATTERN = re.compile(r"\b(" + "|".join(TAGS_LIST) + r")\b", re.IGNORECASE)
