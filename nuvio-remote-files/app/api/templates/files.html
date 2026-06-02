@@ -790,6 +790,36 @@
     </div>
 </div>
 
+<!-- Season Tag Modal -->
+<div class="modal-overlay" id="season-tag-modal-overlay" onclick="closeSeasonTagModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span>Modifica TAG Stagione</span>
+            <span class="modal-close" onclick="closeSeasonTagModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom: 15px; font-size: 0.85rem; color: var(--muted);">
+                Questa operazione aggiornerà i TAG di <strong>tutti gli episodi</strong> della stagione selezionata.
+            </p>
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text);">Serie / Stagione</label>
+                <div id="season-tag-info" style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--accent); padding: 10px; font-family: 'Sora', sans-serif; font-size: 0.85rem;"></div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text);">Nuovi TAG / Qualità (es. 1080p HEVC AAC)</label>
+                <input type="text" id="season-tag-res" placeholder="1080p HEVC AAC" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 10px; outline: none; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+                <p style="font-size: 0.7rem; color: var(--muted); margin-top: 6px;">Lascua vuoto per rimuovere i tag esistenti.</p>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="filter-btn" onclick="closeSeasonTagModal()">Annulla</button>
+                <button class="copy-btn" onclick="submitSeasonTags()">Applica a tutti</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MKV Progress Modal -->
 <div class="modal-overlay" id="mkv-progress-modal-overlay">
     <div class="modal">
@@ -1214,6 +1244,50 @@ function closeRenameModal() {
     document.getElementById('rename-modal-overlay').style.display = 'none';
 }
 
+let currentSeasonData = null;
+
+function openSeasonTagModal(data) {
+    currentSeasonData = data;
+    document.getElementById('season-tag-info').textContent = `${data.series_title} - Stagione ${data.season}`;
+    document.getElementById('season-tag-res').value = (data.resolution || '').replace(/[\[\]]/g, '');
+    document.getElementById('season-tag-modal-overlay').style.display = 'flex';
+}
+
+function closeSeasonTagModal() {
+    document.getElementById('season-tag-modal-overlay').style.display = 'none';
+    currentSeasonData = null;
+}
+
+async function submitSeasonTags() {
+    if (!currentSeasonData) return;
+    
+    const newRes = document.getElementById('season-tag-res').value.trim();
+    
+    closeSeasonTagModal();
+    
+    try {
+        const resp = await fetch(ingressPath + '/admin/library/season/rename', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                series_title: currentSeasonData.series_title,
+                season: currentSeasonData.season,
+                resolution: newRes,
+                paths: currentSeasonData.episodes
+            })
+        });
+        const res = await resp.json();
+        if (res.status === 'ok') {
+            showAlert(`Aggiornati ${res.count} episodi con successo!`);
+            manualScan();
+        } else {
+            showAlert("Errore: " + res.message, "Errore");
+        }
+    } catch (e) {
+        showAlert("Errore durante l'invio: " + e.message, "Errore");
+    }
+}
+
 function toggleRenameFields() {
     const isSeries = document.getElementById('rename-is-series').checked;
     document.getElementById('label-year-season').textContent = isSeries ? 'Stagione' : 'Anno';
@@ -1491,7 +1565,7 @@ function renderTags(tagString) {
 }
 
 const PENCIL_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
-const FILTER_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>`;
+const FILTER_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
 
 function renderMovieRow(file, tbody) {
     const tr = document.createElement('tr');
@@ -1538,8 +1612,9 @@ function renderSeriesGroup(group, tbody) {
             sRow.className = 'group-row indent' + (expandedGroups.has(seasonId) ? ' expanded' : '');
             const eps = group.seasons.get(seasonNum);
             const sCommonRes = getCommonResolution(eps);
+            const seasonActions = `<span class="btn-edit" onclick='event.stopPropagation(); openSeasonTagModal(${JSON.stringify({ series_title: group.title, season: seasonNum, resolution: sCommonRes, episodes: eps.map(e => e.path) }).replace(/'/g, "&apos;")})' title="Modifica TAG Stagione">${PENCIL_SVG}</span>`;
             sRow.innerHTML = `
-                <td></td>
+                <td style="text-align: center; white-space: nowrap;">${seasonActions}</td>
                 <td></td>
                 <td><div class="file-title"><span class="toggle-icon">▶</span>Stagione ${seasonNum}</div></td>
                 <td>${renderTags(sCommonRes)}</td>
@@ -1636,11 +1711,6 @@ function openMkvProgressModal() {
 
 function closeMkvProgressModal() {
     document.getElementById('mkv-progress-modal-overlay').style.display = 'none';
-    // Ensure we reset filter to 'all' to avoid empty views
-    activeFilter = 'all';
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.filter === 'all');
-    });
     render();
 }
 
@@ -1716,7 +1786,7 @@ async function checkInitialFilteringStatus() {
 }
 
 document.getElementById('search').addEventListener('input', e => { searchQuery = e.target.value.trim(); render(); });
-document.querySelectorAll('.filter-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.dataset.filter; render(); }); });
+document.querySelectorAll('.filter-group .filter-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.filter-group .filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.dataset.filter; render(); }); });
 document.getElementById('sort-select').addEventListener('change', e => { const [key, dir] = e.target.value.split('-'); sortKey = key; sortDir = dir; render(); });
 document.querySelectorAll('thead th[data-col]').forEach(th => { th.addEventListener('click', () => { const col = th.dataset.col; if (sortKey === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; } else { sortKey = col; sortDir = 'desc'; } document.querySelectorAll('thead th').forEach(t => t.classList.remove('sort-asc','sort-desc')); th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc'); render(); }); });
 loadFiles();

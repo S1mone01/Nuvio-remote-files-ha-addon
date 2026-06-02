@@ -221,6 +221,66 @@ async def admin_library_rename(request: Request):
         return {"status": "error", "message": str(e)}
 
 
+@router.post("/admin/library/season/rename")
+async def admin_library_season_rename(request: Request):
+    """
+    Manually rename and organize all files in a season with new resolution/tags.
+    """
+    from scanner.organizer import move_file, parse_filename
+    from pathlib import Path
+    
+    MEDIA_ROOT = Path("/media")
+    
+    try:
+        data = await request.json()
+        series_title = data.get("series_title")
+        season = data.get("season")
+        resolution = data.get("resolution")
+        paths = data.get("paths", [])
+        
+        count = 0
+        errors = []
+        
+        for raw_path in paths:
+            if raw_path.startswith("/media/"):
+                path = Path(raw_path)
+            else:
+                path = MEDIA_ROOT / raw_path
+                
+            if not path.exists():
+                errors.append(f"File not found: {raw_path}")
+                continue
+            
+            # For each file, we need to know its episode number to rename it correctly.
+            # We can parse the current filename to extract it.
+            is_ser, title, year, s, e, tags = parse_filename(path.name)
+            
+            # Use the provided season and title to ensure consistency, 
+            # but keep the episode from the filename.
+            success, result = move_file(
+                path,
+                is_series=True,
+                title=series_title,
+                season=season,
+                episode=e if e is not None else 1, # Fallback to 1 if not detectable
+                resolution=resolution
+            )
+            
+            if success:
+                count += 1
+            else:
+                errors.append(f"Error moving {path.name}: {result}")
+        
+        if errors and count == 0:
+            return {"status": "error", "message": "; ".join(errors)}
+            
+        return {"status": "ok", "count": count, "errors": errors}
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] Season rename crash: {traceback.format_exc()}")
+        return {"status": "error", "message": str(e)}
+
+
 @router.post("/admin/downloads/organize")
 def admin_downloads_organize(request: Request):
     """
