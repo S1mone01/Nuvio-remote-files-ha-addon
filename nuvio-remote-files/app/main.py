@@ -48,7 +48,7 @@ async def startup():
     # each thread consumes memory for its stack and I/O buffer.
     # On systems with more RAM (like 8GB), we can allow more threads to 
     # handle concurrent file I/O for streaming more efficiently.
-    to_thread.current_default_thread_limiter().total_tokens = 8
+    to_thread.current_default_thread_limiter().total_tokens = 20
     
     init_db()
     # Explicit garbage collection to free up memory
