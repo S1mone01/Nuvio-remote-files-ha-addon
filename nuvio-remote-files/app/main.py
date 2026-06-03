@@ -16,7 +16,7 @@ except ValueError:
     # Some platforms might not support changing stack size after threads have started
     pass
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -62,9 +62,14 @@ class MemoryEfficientFileResponse(FileResponse):
 
 class MemoryEfficientStaticFiles(StaticFiles):
     def file_response(self, full_path, stat_result, scope, status_code=200):
-        return MemoryEfficientFileResponse(
-            full_path, stat_result=stat_result, scope=scope, status_code=status_code
+        # Fix: FileResponse doesn't take 'scope' in __init__.
+        # Starlette's StaticFiles uses it to handle range requests via the __call__ method of the response.
+        response = MemoryEfficientFileResponse(
+            full_path, stat_result=stat_result, status_code=status_code
         )
+        if self.is_not_modified(response.headers, scope):
+            return Response(status_code=304)
+        return response
 
 
 # Public Stremio addon endpoints
