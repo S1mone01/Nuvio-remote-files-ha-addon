@@ -566,6 +566,10 @@
             .table-wrap { padding: 0 8px 32px; }
             thead th { font-size: 0.65rem; padding: 8px; }
             tbody td { padding: 8px; }
+            
+            /* Hide Tags column on mobile to save space */
+            th[data-col="resolution"], td:nth-child(4) { display: none; }
+            
             .file-title { font-size: 0.8rem; }
             .file-path { font-size: 0.65rem; }
             .res-badge { font-size: 0.65rem; padding: 1px 4px; }
