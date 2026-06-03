@@ -591,9 +591,9 @@
             .stat-value { font-size: 0.85rem; }
             .stat-label { font-size: 0.5rem; }
             
-            /* Hide less important columns on very small screens to avoid horizontal scroll */
-            th[data-col="type"], td:first-child:not(.indent) { display: none; }
-            th[data-col="resolution"], td:nth-child(3) { display: none; }
+            /* Hide Actions and Type on very small screens to keep Title and Size aligned */
+            th:first-child, td:first-child:not(.indent) { display: none; }
+            th[data-col="type"], td:nth-child(2) { display: none; }
         }
     </style>
 </head>
