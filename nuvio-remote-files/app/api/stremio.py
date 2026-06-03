@@ -241,7 +241,7 @@ def manifest_internal():
     return {
         "id": "org.remote-files.internal",
         "name": "Remote Files (Internal)",
-        "version": "1.4.1",
+        "version": "1.4.2",
         "description": "Browse and play your own media over LAN or VPN",
         "behaviorHints": {
             "configurable": True,
@@ -277,7 +277,7 @@ def manifest_external():
     return {
         "id": "org.remote-files.external",
         "name": "Remote Files (External)",
-        "version": "1.4.1",
+        "version": "1.4.2",
         "description": "Browse and play your own media over the internet using HTTPS",
         "behaviorHints": {
             "configurable": True,
