@@ -8,8 +8,10 @@ and wires together the API routers.
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
-
 from fastapi.staticfiles import StaticFiles
+
+from anyio import to_thread
+
 from db.init import init_db
 from api.stremio import router as stremio_router
 from api.admin import router as admin_router
@@ -27,10 +29,14 @@ app.add_middleware(
 
 
 @app.on_event("startup")
-def startup():
+async def startup():
     """
-    Initialize the database schema at application startup.
+    Initialize the database schema and limit worker threads at application startup.
     """
+    # Limit anyio worker threads to prevent OOM on constrained systems
+    # each thread consumes memory for its stack and I/O buffer.
+    to_thread.current_default_thread_limiter().total_tokens = 15
+    
     init_db()
 
 
