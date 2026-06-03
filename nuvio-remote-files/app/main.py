@@ -72,7 +72,7 @@ class ChunkedRangeStaticFiles(StaticFiles):
             return
 
         path = self.get_path(scope)
-        full_path, stat_result = await self.lookup_path(path)
+        full_path, stat_result = self.lookup_path(path)
 
         if stat_result is None or not stat.S_ISREG(stat_result.st_mode):
             await super().__call__(scope, receive, send)
