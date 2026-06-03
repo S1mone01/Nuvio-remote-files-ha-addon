@@ -1,6 +1,6 @@
 name: "Nuvio Remote Files"
 slug: "nuvio_remote_files"
-version: "2.0.0"
+version: "2.1.0"
 description: "Server Stremio locale per HAOS: indicizza e serve i tuoi film e serie da dischi USB."
 url: "https://github.com/S1mone01/Nuvio-remote-files-ha-addon"
 arch:

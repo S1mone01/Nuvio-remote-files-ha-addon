@@ -49,23 +49,22 @@ async def startup():
     """
     # Limit anyio worker threads to prevent OOM on constrained systems
     # each thread consumes memory for its stack and I/O buffer.
-    # On systems with more RAM (like 8GB), we can allow more threads to 
+    # On systems with more RAM (like 8GB), we can allow more threads to
     # handle concurrent file I/O for streaming more efficiently.
     to_thread.current_default_thread_limiter().total_tokens = 8
-    
+
     init_db()
     # Explicit garbage collection to free up memory
     gc.collect()
 
 
-# Dimensione ottimizzata per massimizzare throughput I/O senza pesare sulla RAM
-CHUNK_SIZE = 1024 * 1024  # 1 MB chunk
+# Leggi sempre a chunk piccoli anche all'interno di un range:
+CHUNK_SIZE = 1024 * 64  # 64 KB — abbastanza piccolo, abbastanza veloce
 
 class ChunkedRangeStaticFiles(StaticFiles):
     """
-    StaticFiles che serve i range request leggendo sempre a chunk di dimensione fissa,
-    garantendo uso di memoria O(1). Gestisce proattivamente i disconnect del client
-    (es. seek o stop riproduzione) per rilasciare i file descriptor e fermare i thread di I/O.
+    StaticFiles che serve i range request leggendo sempre a chunk piccoli,
+    invece di fare un unico read() sull'intero range (che causa OOM su seek).
     """
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -98,24 +97,10 @@ class ChunkedRangeStaticFiles(StaticFiles):
             except Exception:
                 pass
 
-        # Gestione di range requests invalidi
-        if start >= file_size or end >= file_size or start > end:
-            await send({
-                "type": "http.response.start",
-                "status": 416,
-                "headers": [(b"content-range", f"bytes */{file_size}".encode())],
-            })
-            await send({"type": "http.response.body", "body": b""})
-            return
-
         content_length = end - start + 1
 
-        import mimetypes
-        content_type, _ = mimetypes.guess_type(str(full_path))
-        content_type = content_type or "application/octet-stream"
-
         response_headers = [
-            (b"content-type", content_type.encode()),
+            (b"content-type", b"video/x-matroska"),
             (b"content-length", str(content_length).encode()),
             (b"accept-ranges", b"bytes"),
             (b"content-range", f"bytes {start}-{end}/{file_size}".encode()),
@@ -127,52 +112,20 @@ class ChunkedRangeStaticFiles(StaticFiles):
             "headers": response_headers,
         })
 
-        client_disconnected = anyio.Event()
-
-        async def listen_for_disconnect():
-            try:
-                while True:
-                    message = await receive()
-                    if message["type"] == "http.disconnect":
-                        client_disconnected.set()
-                        break
-            except Exception:
-                # Sia eventuali error ASGI che CancelledError da anyio
-                pass
-
-        async def send_file():
-            try:
-                bytes_sent = 0
-                # anyio.open_file utilizza thread asincroni poolati, ideale per I/O da disco
-                async with await anyio.open_file(full_path, "rb") as f:
-                    await f.seek(start)
-                    while bytes_sent < content_length and not client_disconnected.is_set():
-                        chunk_size = min(CHUNK_SIZE, content_length - bytes_sent)
-                        chunk = await f.read(chunk_size)
-                        if not chunk:
-                            break
-                        
-                        if client_disconnected.is_set():
-                            break
-
-                        await send({
-                            "type": "http.response.body",
-                            "body": chunk,
-                            "more_body": (bytes_sent + len(chunk)) < content_length,
-                        })
-                        bytes_sent += len(chunk)
-            except Exception:
-                pass
-            finally:
-                client_disconnected.set()
-
-        # Isoliamo l'operazione in un task group per gestire parallelamente I/O e disconnessioni
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(listen_for_disconnect)
-            await send_file()
-            # Finito il file (o interrotto), cancelliamo listen_for_disconnect
-            tg.cancel_scope.cancel()
-
+        # Leggi e invia a chunk piccoli
+        bytes_sent = 0
+        async with await anyio.open_file(full_path, "rb") as f:
+            await f.seek(start)
+            while bytes_sent < content_length:
+                chunk = await f.read(min(CHUNK_SIZE, content_length - bytes_sent))
+                if not chunk:
+                    break
+                await send({
+                    "type": "http.response.body",
+                    "body": chunk,
+                    "more_body": (bytes_sent + len(chunk)) < content_length,
+                })
+                bytes_sent += len(chunk)
 
 
 # Public Stremio addon endpoints
