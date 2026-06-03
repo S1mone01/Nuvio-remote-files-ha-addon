@@ -5,8 +5,19 @@ This module creates the FastAPI app, initializes the database on startup,
 and wires together the API routers.
 """
 
+import threading
+import gc
+
+# Set a smaller thread stack size to save virtual memory on constrained systems.
+# Default is usually 8MB; 512KB is plenty for these I/O tasks.
+try:
+    threading.stack_size(1024 * 512)
+except ValueError:
+    # Some platforms might not support changing stack size after threads have started
+    pass
+
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -40,6 +51,20 @@ async def startup():
     to_thread.current_default_thread_limiter().total_tokens = 8
     
     init_db()
+    # Explicit garbage collection to free up memory
+    gc.collect()
+
+
+# Custom StaticFiles implementation that uses a smaller chunk size (16KB vs 64KB)
+# to minimize memory spikes during concurrent range requests (seeking).
+class MemoryEfficientFileResponse(FileResponse):
+    chunk_size = 1024 * 16
+
+class MemoryEfficientStaticFiles(StaticFiles):
+    def file_response(self, full_path, stat_result, scope, status_code=200):
+        return MemoryEfficientFileResponse(
+            full_path, stat_result=stat_result, scope=scope, status_code=status_code
+        )
 
 
 # Public Stremio addon endpoints
@@ -51,9 +76,8 @@ app.include_router(admin_router)
 # Auth endpoints
 app.include_router(auth_router)
 
-# Serve static media files
-# Mounted under /media/ to avoid shadowing API routes
-app.mount("/media", StaticFiles(directory="/media"), name="media")
+# Serve static media files using the memory-efficient implementation
+app.mount("/media", MemoryEfficientStaticFiles(directory="/media"), name="media")
 
 
 
