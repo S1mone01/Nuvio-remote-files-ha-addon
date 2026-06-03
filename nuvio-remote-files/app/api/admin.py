@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 from pathlib import Path
 import sqlite3
+import logging
 
 from scanner import scan_movies, scan_series
 from scanner.organizer import organize_downloads
@@ -177,7 +178,7 @@ async def admin_downloads_rename(request: Request):
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"[ERROR] Manual rename crash: {error_details}")
+        logging.error(f"Manual rename crash: {error_details}")
         return {"status": "error", "message": f"Errore interno del server: {str(e)}"}
 
 
@@ -220,7 +221,7 @@ async def admin_library_rename(request: Request):
             return {"status": "error", "message": result}
     except Exception as e:
         import traceback
-        print(f"[ERROR] Library rename crash: {traceback.format_exc()}")
+        logging.error(f"Library rename crash: {traceback.format_exc()}")
         return {"status": "error", "message": str(e)}
 
 
@@ -281,7 +282,7 @@ async def admin_library_season_rename(request: Request):
         return {"status": "ok", "count": count, "errors": errors}
     except Exception as e:
         import traceback
-        print(f"[ERROR] Season rename crash: {traceback.format_exc()}")
+        logging.error(f"Season rename crash: {traceback.format_exc()}")
         return {"status": "error", "message": str(e)}
 
 
@@ -394,7 +395,7 @@ async def admin_debug_parse(request: Request):
             }
         }
     except Exception as e:
-        print(f"[ERROR] Debug parse crash: {traceback.format_exc()}")
+        logging.error(f"Debug parse crash: {traceback.format_exc()}")
         return {"status": "error", "message": f"Errore interno del server: {str(e)}"}
 
 

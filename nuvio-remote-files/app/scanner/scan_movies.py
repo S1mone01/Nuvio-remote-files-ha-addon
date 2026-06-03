@@ -8,6 +8,7 @@ and synchronizes movie and file records into the SQLite database.
 from pathlib import Path
 import re
 import sqlite3
+import logging
 
 from core.config import MOVIES_DIR_NAME
 from scanner.utils import extract_tags, clean_name
@@ -30,7 +31,7 @@ def scan_movies():
     - Removes database entries for files no longer present
     """
     if not MOVIES_ROOT.exists():
-        print(f"[WARN] Movies directory not found: {MOVIES_ROOT}")
+        logging.warning(f"[WARN] Movies directory not found: {MOVIES_ROOT}")
         return
 
     conn = sqlite3.connect(DB_PATH)
@@ -50,7 +51,7 @@ def scan_movies():
 
             match = PARSER_PATTERN.match(path.name)
             if not match:
-                print(f"[SKIP] Unrecognized movie filename: {path.name}")
+                logging.info(f"[SKIP] Unrecognized movie filename: {path.name}")
                 continue
 
             title = clean_name(match.group("title"))
@@ -59,11 +60,11 @@ def scan_movies():
             # Extract tags using centralized logic
             tags = extract_tags(path.name)
 
-            print(f"[INFO] TMDB lookup: {title} ({year})")
+            logging.info(f"[INFO] TMDB lookup: {title} ({year})")
             meta = lookup_movie(title, year)
 
             if not meta:
-                print(f"[WARN] TMDB lookup failed: {title}")
+                logging.warning(f"[WARN] TMDB lookup failed: {title}")
                 continue
 
             # Track file as seen for cleanup
@@ -94,7 +95,7 @@ def scan_movies():
             )
 
         conn.commit()
-        print("[OK] Movie scan complete")
+        logging.info("[OK] Movie scan complete")
 
     finally:
         conn.close()

@@ -2,6 +2,7 @@ import json
 import subprocess
 import os
 import shutil
+import logging
 from pathlib import Path
 from core.config import MOVIES_DIR_NAME, SERIES_DIR_NAME
 
@@ -195,7 +196,7 @@ def process_mkv_tracks(input_path: Path) -> Path:
             return input_path
 
     except Exception as e:
-        print(f"[FFMPEG] [ERROR] Failed to process {input_path.name}: {e}")
+        logging.error(f"[FFMPEG] [ERROR] Failed to process {input_path.name}: {e}")
         FILTERING_STATUS["last_error"] = f"Errore su {input_path.name}: {str(e)[:150]}"
         temp_output = input_path.with_suffix(".tmp.mkv")
         if temp_output.exists():
@@ -246,7 +247,7 @@ def filter_existing_library():
             FILTERING_STATUS["processed"] += 1
             
     except Exception as e:
-        print(f"[FFMPEG] [ERROR] Library filtering failed: {e}")
+        logging.error(f"[FFMPEG] Library filtering failed: {e}")
         FILTERING_STATUS["last_error"] = f"Errore critico: {str(e)}"
     finally:
         FILTERING_STATUS["is_running"] = False

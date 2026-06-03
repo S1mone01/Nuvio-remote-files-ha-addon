@@ -9,6 +9,7 @@ identifies them using regex and TMDB, and moves them into the structured
 import os
 import re
 import shutil
+import logging
 from pathlib import Path
 
 from core.config import (
@@ -31,17 +32,17 @@ VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".wmv"}
 
 def process_mkv_if_enabled(path: Path):
     """Filter MKV tracks if the option is enabled."""
-    print(f"[ORGANIZE] Checking MKV filter for {path.name} (Enabled: {FILTER_MKV_TRACKS})")
+    logging.info(f"[ORGANIZE] Checking MKV filter for {path.name} (Enabled: {FILTER_MKV_TRACKS})")
     if FILTER_MKV_TRACKS and path.suffix.lower() == ".mkv":
         try:
-            print(f"[ORGANIZE] Filtering tracks for {path.name}...")
+            logging.info(f"[ORGANIZE] Filtering tracks for {path.name}...")
             from scanner.ffmpeg_utils import process_mkv_tracks
             process_mkv_tracks(path)
-            print(f"[ORGANIZE] Filtering complete for {path.name}")
+            logging.info(f"[ORGANIZE] Filtering complete for {path.name}")
         except Exception as e:
-            print(f"[ORGANIZE] [ERROR] Failed to filter MKV {path.name}: {e}")
+            logging.error(f"[ORGANIZE] [ERROR] Failed to filter MKV {path.name}: {e}")
     elif not FILTER_MKV_TRACKS:
-        print(f"[ORGANIZE] MKV filter is DISABLED in configuration.")
+        logging.info(f"[ORGANIZE] MKV filter is DISABLED in configuration.")
 
 def get_clean_stem(filename: str) -> tuple[str, str]:
     """
@@ -150,14 +151,14 @@ def organize_downloads():
     Recursively scan DOWNLOADS_ROOT, identify files, and move them.
     """
     if not DOWNLOADS_ROOT.exists():
-        print(f"[ORGANIZE] Downloads directory not found: {DOWNLOADS_ROOT}")
+        logging.warning(f"[ORGANIZE] Downloads directory not found: {DOWNLOADS_ROOT}")
         return
 
     # Create destination roots if they don't exist
     MOVIES_ROOT.mkdir(parents=True, exist_ok=True)
     SERIES_ROOT.mkdir(parents=True, exist_ok=True)
 
-    print(f"[ORGANIZE] Starting organization in {DOWNLOADS_ROOT}...")
+    logging.info(f"[ORGANIZE] Starting organization in {DOWNLOADS_ROOT}...")
 
     # Iterate recursively over all files
     files_to_process = []
@@ -190,7 +191,7 @@ def _run_organization(files_to_process: list[Path]):
     from scanner.ffmpeg_utils import FILTERING_STATUS
     
     if not files_to_process:
-        print("[ORGANIZE] No files to process.")
+        logging.info("[ORGANIZE] No files to process.")
         return
 
     FILTERING_STATUS["is_running"] = True
@@ -201,7 +202,7 @@ def _run_organization(files_to_process: list[Path]):
     try:
         for path in files_to_process:
             FILTERING_STATUS["current_file"] = path.name
-            print(f"[ORGANIZE] Processing: {path.name}")
+            logging.info(f"[ORGANIZE] Processing: {path.name}")
             
             process_mkv_if_enabled(path)
             
@@ -211,7 +212,7 @@ def _run_organization(files_to_process: list[Path]):
                 # Series logic - use smart lookup to handle extra words in title
                 meta = smart_lookup_series(title)
                 if not meta:
-                    print(f"[ORGANIZE] [SKIP] Series not found on TMDB: {title}")
+                    logging.warning(f"[ORGANIZE] [SKIP] Series not found on TMDB: {title}")
                     FILTERING_STATUS["processed"] += 1
                     continue
 
@@ -230,15 +231,15 @@ def _run_organization(files_to_process: list[Path]):
                 dest_path = season_dir / new_filename
 
                 try:
-                    print(f"[ORGANIZE] Moving Series: {path.name} -> {dest_path}")
+                    logging.info(f"[ORGANIZE] Moving Series: {path.name} -> {dest_path}")
                     shutil.move(str(path), str(dest_path))
                 except Exception as e:
-                    print(f"[ORGANIZE] [ERROR] Failed to move {path.name}: {e}")
+                    logging.error(f"[ORGANIZE] [ERROR] Failed to move {path.name}: {e}")
             else:
                 # Movie logic
                 meta = lookup_movie(title, year)
                 if not meta:
-                    print(f"[ORGANIZE] [SKIP] Movie not found on TMDB: {title} ({year})")
+                    logging.warning(f"[ORGANIZE] [SKIP] Movie not found on TMDB: {title} ({year})")
                     FILTERING_STATUS["processed"] += 1
                     continue
 
@@ -250,10 +251,10 @@ def _run_organization(files_to_process: list[Path]):
                 dest_path = MOVIES_ROOT / new_filename
 
                 try:
-                    print(f"[ORGANIZE] Moving Movie: {path.name} -> {dest_path}")
+                    logging.info(f"[ORGANIZE] Moving Movie: {path.name} -> {dest_path}")
                     shutil.move(str(path), str(dest_path))
                 except Exception as e:
-                    print(f"[ORGANIZE] [ERROR] Failed to move {path.name}: {e}")
+                    logging.error(f"[ORGANIZE] [ERROR] Failed to move {path.name}: {e}")
             
             FILTERING_STATUS["processed"] += 1
     finally:
@@ -263,7 +264,7 @@ def _run_organization(files_to_process: list[Path]):
 
     # Cleanup: remove empty directories in DOWNLOADS_ROOT
     cleanup_empty_dirs(DOWNLOADS_ROOT)
-    print("[ORGANIZE] Organization complete.")
+    logging.info("[ORGANIZE] Organization complete.")
 
 
 def smart_lookup_series(title: str):
@@ -272,7 +273,7 @@ def smart_lookup_series(title: str):
     word by word from the right (to handle cases where episode title is included).
     """
     current_title = clean_name(title)
-    print(f"[ORGANIZE] Smart lookup start: '{current_title}'")
+    logging.info(f"[ORGANIZE] Smart lookup start: '{current_title}'")
     
     meta = lookup_series(current_title)
     if meta:
@@ -289,13 +290,13 @@ def smart_lookup_series(title: str):
             continue
             
         attempts.append(shorter_title)
-        print(f"[ORGANIZE] Fallback lookup attempt: '{shorter_title}'")
+        logging.info(f"[ORGANIZE] Fallback lookup attempt: '{shorter_title}'")
         meta = lookup_series(shorter_title)
         if meta:
-            print(f"[ORGANIZE] Found match for '{shorter_title}': {meta['title']}")
+            logging.info(f"[ORGANIZE] Found match for '{shorter_title}': {meta['title']}")
             return meta
     
-    print(f"[ORGANIZE] Smart lookup failed for all attempts: {attempts}")
+    logging.warning(f"[ORGANIZE] Smart lookup failed for all attempts: {attempts}")
     return None
 
 
@@ -335,11 +336,11 @@ def move_file(file_path: Path, is_series: bool, title: str, year: int = None, se
         
         process_mkv_if_enabled(file_path)
         
-        print(f"[ORGANIZE] Manually Moving: {file_path.name} -> {dest_path}")
+        logging.info(f"[ORGANIZE] Manually Moving: {file_path.name} -> {dest_path}")
         shutil.move(str(file_path), str(dest_path))
         return True, str(dest_path)
     except Exception as e:
-        print(f"[ORGANIZE] [ERROR] Failed to move {file_path.name}: {e}")
+        logging.error(f"[ORGANIZE] [ERROR] Failed to move {file_path.name}: {e}")
         return False, str(e)
 
 
@@ -350,5 +351,5 @@ def cleanup_empty_dirs(path: Path):
         if sub_path.is_dir():
             cleanup_empty_dirs(sub_path)
             if not os.listdir(sub_path):
-                print(f"[ORGANIZE] Removing empty directory: {sub_path}")
+                logging.info(f"[ORGANIZE] Removing empty directory: {sub_path}")
                 sub_path.rmdir()

@@ -1,5 +1,6 @@
 import json
 import subprocess
+import logging
 from pathlib import Path
 
 def get_mkv_tracks(file_path: Path):
@@ -30,7 +31,7 @@ def get_mkv_tracks(file_path: Path):
             })
         return result_tracks
     except Exception as e:
-        print(f"[MKVUTILS] Error getting tracks for {file_path.name}: {e}")
+        logging.error(f"[MKVUTILS] Error getting tracks for {file_path.name}: {e}")
         return []
 
 def update_mkv_metadata(file_path: Path, track_updates: list):

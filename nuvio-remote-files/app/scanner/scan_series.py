@@ -8,6 +8,7 @@ and synchronizes series, episodes, and file records into the SQLite database.
 from pathlib import Path
 import re
 import sqlite3
+import logging
 
 from core.config import SERIES_DIR_NAME
 from scanner.utils import extract_tags
@@ -83,7 +84,7 @@ def scan_series():
     - Removes database entries for files no longer present
     """
     if not SERIES_ROOT.exists():
-        print(f"[WARN] Series directory not found: {SERIES_ROOT}")
+        logging.warning(f"[WARN] Series directory not found: {SERIES_ROOT}")
         return
 
     conn = sqlite3.connect(DB_PATH)
@@ -95,11 +96,11 @@ def scan_series():
                 continue
 
             series_name = series_dir.name
-            print(f"[INFO] TMDB lookup: {series_name}")
+            logging.info(f"[INFO] TMDB lookup: {series_name}")
 
             meta = lookup_series(series_name)
             if not meta:
-                print(f"[WARN] TMDB lookup failed: {series_name}")
+                logging.warning(f"[WARN] TMDB lookup failed: {series_name}")
                 continue
 
             # 1) Upsert series metadata
@@ -112,7 +113,7 @@ def scan_series():
 
                 season_match = SEASON_PATTERN.match(season_dir.name)
                 if not season_match:
-                    print(f"[SKIP] Season folder: {season_dir.name}")
+                    logging.info(f"[SKIP] Season folder: {season_dir.name}")
                     continue
 
                 season_num = int(season_match.group("season"))
@@ -123,14 +124,14 @@ def scan_series():
 
                     parsed = parse_episode_filename(ep_file.name)
                     if not parsed:
-                        print(f"[SKIP] Episode file: {ep_file.name}")
+                        logging.info(f"[SKIP] Episode file: {ep_file.name}")
                         continue
 
                     season_from_file, episode_num, resolution = parsed
 
                     # Optional sanity check (non-fatal)
                     if season_from_file != season_num:
-                        print(
+                        logging.warning(
                             f"[WARN] Season mismatch: folder={season_num}, "
                             f"filename={season_from_file} ({ep_file.name})"
                         )
@@ -168,7 +169,7 @@ def scan_series():
             )
 
         conn.commit()
-        print("[OK] Series scan complete")
+        logging.info("[OK] Series scan complete")
 
     finally:
         conn.close()

@@ -7,6 +7,7 @@ movies and TV series into normalized metadata used by the application.
 
 import os
 import requests
+import logging
 
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 TMDB_BASE = "https://api.themoviedb.org/3"
@@ -35,7 +36,7 @@ def _tmdb_get(path, params=None):
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.RequestException as e:
-        print(f"[ERROR] TMDB request failed: {e}")
+        logging.error(f"TMDB request failed: {e}")
         return None
 
 
