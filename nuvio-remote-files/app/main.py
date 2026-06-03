@@ -35,7 +35,9 @@ async def startup():
     """
     # Limit anyio worker threads to prevent OOM on constrained systems
     # each thread consumes memory for its stack and I/O buffer.
-    to_thread.current_default_thread_limiter().total_tokens = 15
+    # On systems with more RAM (like 8GB), we can allow more threads to 
+    # handle concurrent file I/O for streaming more efficiently.
+    to_thread.current_default_thread_limiter().total_tokens = 40
     
     init_db()
 
