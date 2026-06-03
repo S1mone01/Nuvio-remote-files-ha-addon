@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Remote Files – Libreria</title>
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;400;600;700&display=swap');
 
@@ -429,6 +431,90 @@
             background: rgba(88,166,255,0.1);
         }
 
+        .btn-play {
+            cursor: pointer;
+            color: var(--muted);
+            transition: color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            margin-right: 8px;
+            border-radius: 4px;
+            vertical-align: middle;
+        }
+        .btn-play:hover {
+            color: #ff9800;
+            background: rgba(255, 152, 0, 0.1);
+        }
+
+        /* ── Player Modal ── */
+        .player-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            display: none;
+            flex-direction: column;
+            z-index: 2000;
+        }
+
+        .player-header {
+            padding: 15px 25px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 2001;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: opacity 0.3s;
+        }
+
+        .player-title {
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .player-close {
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+            line-height: 1;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .player-close:hover { opacity: 1; }
+
+        .video-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        .video-js {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Hide header when not hovering in player */
+        .player-overlay:not(:hover) .player-header {
+            opacity: 0;
+        }
+
+        #ac3-warning {
+            transition: opacity 2s;
+        }
+
         /* ── Modal ── */
         .modal-overlay {
             position: fixed;
@@ -686,6 +772,17 @@
             </thead>
             <tbody id="file-tbody"></tbody>
         </table>
+    </div>
+</div>
+
+<!-- Player Modal -->
+<div class="player-overlay" id="player-overlay">
+    <div class="player-header">
+        <span class="player-title" id="player-title">Riproduzione</span>
+        <span class="player-close" onclick="closePlayer()">&times;</span>
+    </div>
+    <div class="video-container" id="video-container">
+        <!-- Video element will be injected here -->
     </div>
 </div>
 
@@ -1510,7 +1607,8 @@ function renderDownloads() {
             ? '<span class="badge" style="background:rgba(247,129,102,0.15);color:var(--warn)">Non riconosciuto</span>'
             : '<span class="badge" style="background:rgba(88,166,255,0.15);color:var(--accent)">In attesa</span>';
 
-        let actions = `<button class="btn-rename" onclick='openRenameModal(${JSON.stringify(file).replace(/'/g, "&apos;")})'>Identifica</button>`;
+        let actions = `<span class="btn-play" onclick='playFile("${file.path.replace(/\\/g, '/')}", "${(file.name).replace(/'/g, "\\'")}")' title="Riproduci">${PLAY_SVG}</span>`;
+        actions += `<button class="btn-rename" onclick='openRenameModal(${JSON.stringify(file).replace(/'/g, "&apos;")})'>Identifica</button>`;
         if (file.path && file.path.toLowerCase().endsWith('.mkv')) {
             actions += `<span class="btn-edit" style="color:var(--accent2); margin-left: 10px;" onclick='filterSingleFile(${JSON.stringify(file).replace(/'/g, "&apos;")}, false)' title="Filtra Audio/Sub ITA">${FILTER_SVG}</span>`;
         }
@@ -1632,10 +1730,99 @@ function renderTags(tagString) {
 
 const PENCIL_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
 const FILTER_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+const PLAY_SVG   = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+
+let playerInstance = null;
+
+function playFile(path, title) {
+    // Clean path for URL (replace backslashes and encode)
+    const cleanPath = path.replace(/\\/g, '/');
+    const videoUrl = window.location.origin + ingressPath + "/media/" + encodeURI(cleanPath);
+    
+    const overlay = document.getElementById('player-overlay');
+    const container = document.getElementById('video-container');
+    const titleEl = document.getElementById('player-title');
+    
+    titleEl.textContent = title || basename(path);
+    overlay.style.display = 'flex';
+    
+    // Inject video element with some compatibility logic
+    container.innerHTML = `
+        <video id="vjs-player" class="video-js vjs-big-play-centered" controls preload="auto">
+            <source src="${videoUrl}" type="video/mp4">
+            <source src="${videoUrl}" type="video/webm">
+            <source src="${videoUrl}" type="video/x-matroska">
+            <p class="vjs-no-js">Il tuo browser non supporta la riproduzione diretta di questo file.</p>
+        </video>
+        <div id="ac3-warning" style="display:none; position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: #ff9800; padding: 10px 20px; border-radius: 8px; font-size: 0.8rem; z-index: 2002; border: 1px solid #ff9800; text-align: center; pointer-events: none;">
+            ⚠️ Nota: L'audio AC3 richiede un browser compatibile (Safari, Edge) o supporto hardware.
+        </div>
+    `;
+
+    // Initialize Video.js
+    playerInstance = videojs('vjs-player', {
+        autoplay: true,
+        fluid: false,
+        responsive: true,
+        playbackRates: [0.5, 1, 1.25, 1.5, 2],
+        controlBar: {
+            children: [
+                'playToggle',
+                'volumePanel',
+                'currentTimeDisplay',
+                'timeDivider',
+                'durationDisplay',
+                'progressControl',
+                'liveDisplay',
+                'remainingTimeDisplay',
+                'customControlSpacer',
+                'playbackRateMenuButton',
+                'chaptersButton',
+                'descriptionsButton',
+                'subsCapsButton',
+                'audioTrackButton',
+                'fullscreenToggle',
+            ],
+        },
+    });
+
+    // Show AC3 warning if it's an MKV or has AC3 in title
+    if (path.toLowerCase().includes('ac3') || path.toLowerCase().endsWith('.mkv')) {
+        document.getElementById('ac3-warning').style.display = 'block';
+        setTimeout(() => {
+            const warn = document.getElementById('ac3-warning');
+            if (warn) warn.style.opacity = '0';
+            setTimeout(() => { if (warn) warn.style.display = 'none'; }, 2000);
+        }, 5000);
+    }
+
+    // Attempt to enter browser fullscreen
+    const requestFullScreen = overlay.requestFullscreen || overlay.webkitRequestFullscreen || overlay.msRequestFullscreen;
+    if (requestFullScreen) {
+        requestFullScreen.call(overlay).catch(err => {
+            console.log("Error attempting to enable full-screen mode:", err.message);
+        });
+    }
+}
+
+function closePlayer() {
+    if (playerInstance) {
+        playerInstance.dispose();
+        playerInstance = null;
+    }
+    document.getElementById('player-overlay').style.display = 'none';
+    
+    // Exit browser fullscreen if active
+    if (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
+        const exitFullScreen = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+        if (exitFullScreen) exitFullScreen.call(document);
+    }
+}
 
 function renderMovieRow(file, tbody) {
     const tr = document.createElement('tr');
-    let actions = `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(file).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
+    let actions = `<span class="btn-play" onclick='playFile("${file.path.replace(/\\/g, '/')}", "${(file.title || basename(file.path)).replace(/'/g, "\\'")}")' title="Riproduci">${PLAY_SVG}</span>`;
+    actions += `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(file).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
     
     if (file.path && file.path.toLowerCase().endsWith('.mkv')) {
         actions += `<span class="btn-edit" style="color:var(--accent2)" onclick='filterSingleFile(${JSON.stringify(file).replace(/'/g, "&apos;")}, true)' title="Filtra Audio/Sub ITA">${FILTER_SVG}</span>`;
@@ -1702,7 +1889,8 @@ function renderSeriesGroup(group, tbody) {
                 eps.sort((a,b) => (a.episode || 0) - (b.episode || 0)).forEach(ep => {
                     const epRow = document.createElement('tr');
                     epRow.className = 'nested-row visible';
-                    let epActions = `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(ep).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
+                    let epActions = `<span class="btn-play" onclick='playFile("${ep.path.replace(/\\/g, '/')}", "${(group.title + ' - Episodio ' + ep.episode).replace(/'/g, "\\'")}")' title="Riproduci">${PLAY_SVG}</span>`;
+                    epActions += `<span class="btn-edit" onclick='openRenameModal(${JSON.stringify(ep).replace(/'/g, "&apos;")}, true)' title="Rinomina/Identifica">${PENCIL_SVG}</span>`;
                     
                     if (ep.path && ep.path.toLowerCase().endsWith('.mkv')) {
                         epActions += `<span class="btn-edit" style="color:var(--accent2)" onclick='filterSingleFile(${JSON.stringify(ep).replace(/'/g, "&apos;")}, true)' title="Filtra Audio/Sub ITA">${FILTER_SVG}</span>`;
