@@ -112,20 +112,47 @@ class ChunkedRangeStaticFiles(StaticFiles):
             "headers": response_headers,
         })
 
-        # Leggi e invia a chunk piccoli
-        bytes_sent = 0
-        async with await anyio.open_file(full_path, "rb") as f:
-            await f.seek(start)
-            while bytes_sent < content_length:
-                chunk = await f.read(min(CHUNK_SIZE, content_length - bytes_sent))
-                if not chunk:
-                    break
-                await send({
-                    "type": "http.response.body",
-                    "body": chunk,
-                    "more_body": (bytes_sent + len(chunk)) < content_length,
-                })
-                bytes_sent += len(chunk)
+        client_disconnected = anyio.Event()
+
+        async def listen_for_disconnect():
+            try:
+                while True:
+                    message = await receive()
+                    if message["type"] == "http.disconnect":
+                        client_disconnected.set()
+                        break
+            except Exception:
+                pass
+
+        async def send_file():
+            try:
+                bytes_sent = 0
+                async with await anyio.open_file(full_path, "rb") as f:
+                    await f.seek(start)
+                    while bytes_sent < content_length and not client_disconnected.is_set():
+                        chunk = await f.read(min(CHUNK_SIZE, content_length - bytes_sent))
+                        if not chunk:
+                            break
+                        
+                        if client_disconnected.is_set():
+                            break
+
+                        await send({
+                            "type": "http.response.body",
+                            "body": chunk,
+                            "more_body": (bytes_sent + len(chunk)) < content_length,
+                        })
+                        bytes_sent += len(chunk)
+            except Exception:
+                pass
+            finally:
+                client_disconnected.set()
+
+        # Usiamo un task group per gestire parallelamente l'invio e l'ascolto della disconnessione
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(listen_for_disconnect)
+            await send_file()
+            tg.cancel_scope.cancel()
 
 
 # Public Stremio addon endpoints
