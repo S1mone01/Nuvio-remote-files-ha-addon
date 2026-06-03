@@ -18,6 +18,7 @@ MEDIA_DISK_NAME = os.getenv("MEDIA_DISK_NAME")
 # Base URLs for serving media
 MEDIA_BASE_URL_INTERNAL = os.getenv("MEDIA_BASE_URL_INTERNAL")
 MEDIA_BASE_URL_EXTERNAL = os.getenv("MEDIA_BASE_URL_EXTERNAL")
+REDIRECT_NAS_URL = os.getenv("REDIRECT_NAS_URL")
 
 # Stream provider display names shown in Stremio
 STREAM_PROVIDER_NAME_INTERNAL = os.getenv(

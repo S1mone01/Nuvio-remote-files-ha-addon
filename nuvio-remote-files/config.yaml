@@ -1,6 +1,6 @@
 name: "Nuvio Remote Files"
 slug: "nuvio_remote_files"
-version: "1.9.1"
+version: "1.9.2"
 description: "Server Stremio locale per HAOS: indicizza e serve i tuoi film e serie da dischi USB."
 url: "https://github.com/S1mone01/Nuvio-remote-files-ha-addon"
 arch:
@@ -29,6 +29,7 @@ options:
   media_disk_name: "EXTERNAL_USB"
   media_subpath: ""
   media_base_url: ""
+  redirect_nas_url: ""
   filter_mkv_tracks: false
 schema:
   port: port
@@ -41,4 +42,5 @@ schema:
   media_disk_name: str
   media_subpath: str?
   media_base_url: str?
+  redirect_nas_url: str?
   filter_mkv_tracks: bool
