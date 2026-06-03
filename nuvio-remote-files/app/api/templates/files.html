@@ -779,7 +779,10 @@
 <div class="player-overlay" id="player-overlay">
     <div class="player-header">
         <span class="player-title" id="player-title">Riproduzione</span>
-        <span class="player-close" onclick="closePlayer()">&times;</span>
+        <div style="display: flex; gap: 20px; align-items: center;">
+            <a id="player-download-link" href="#" download style="color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600;">Scarica File</a>
+            <span class="player-close" onclick="closePlayer()">&times;</span>
+        </div>
     </div>
     <div class="video-container" id="video-container">
         <!-- Video element will be injected here -->
@@ -1735,27 +1738,34 @@ const PLAY_SVG   = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" 
 let playerInstance = null;
 
 function playFile(path, title) {
-    // Clean path for URL (replace backslashes and encode)
-    const cleanPath = path.replace(/\\/g, '/');
-    const videoUrl = window.location.origin + ingressPath + "/media/" + encodeURI(cleanPath);
+    // Correctly encode each part of the path to handle spaces, #, and special characters
+    const parts = path.split(/[\\/]/);
+    const encodedPath = parts.map(p => encodeURIComponent(p)).join('/');
+    const videoUrl = window.location.origin + ingressPath + "/media/" + encodedPath;
     
     const overlay = document.getElementById('player-overlay');
     const container = document.getElementById('video-container');
     const titleEl = document.getElementById('player-title');
     
     titleEl.textContent = title || basename(path);
+    document.getElementById('player-download-link').href = videoUrl;
     overlay.style.display = 'flex';
     
-    // Inject video element with some compatibility logic
+    // Determine MIME type for the player
+    const ext = path.split('.').pop().toLowerCase();
+    let mimeType = 'video/mp4'; // Default
+    if (ext === 'mkv') mimeType = 'video/x-matroska';
+    else if (ext === 'webm') mimeType = 'video/webm';
+    else if (ext === 'avi') mimeType = 'video/x-msvideo';
+    
+    // Inject video element
     container.innerHTML = `
         <video id="vjs-player" class="video-js vjs-big-play-centered" controls preload="auto">
-            <source src="${videoUrl}" type="video/mp4">
-            <source src="${videoUrl}" type="video/webm">
-            <source src="${videoUrl}" type="video/x-matroska">
+            <source src="${videoUrl}" type="${mimeType}">
             <p class="vjs-no-js">Il tuo browser non supporta la riproduzione diretta di questo file.</p>
         </video>
         <div id="ac3-warning" style="display:none; position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: #ff9800; padding: 10px 20px; border-radius: 8px; font-size: 0.8rem; z-index: 2002; border: 1px solid #ff9800; text-align: center; pointer-events: none;">
-            ⚠️ Nota: L'audio AC3 richiede un browser compatibile (Safari, Edge) o supporto hardware.
+            ⚠️ Nota: Se non senti l'audio o il video non parte, usa un browser come Safari o Edge, oppure scarica il file.
         </div>
     `;
 
@@ -1764,26 +1774,14 @@ function playFile(path, title) {
         autoplay: true,
         fluid: false,
         responsive: true,
-        playbackRates: [0.5, 1, 1.25, 1.5, 2],
-        controlBar: {
-            children: [
-                'playToggle',
-                'volumePanel',
-                'currentTimeDisplay',
-                'timeDivider',
-                'durationDisplay',
-                'progressControl',
-                'liveDisplay',
-                'remainingTimeDisplay',
-                'customControlSpacer',
-                'playbackRateMenuButton',
-                'chaptersButton',
-                'descriptionsButton',
-                'subsCapsButton',
-                'audioTrackButton',
-                'fullscreenToggle',
-            ],
-        },
+        playbackRates: [0.5, 1, 1.25, 1.5, 2]
+    });
+
+    // Error handling
+    playerInstance.on('error', function() {
+        const error = playerInstance.error();
+        console.error("Video.js error:", error);
+        showAlert("Errore di riproduzione: Il formato del file potrebbe non essere supportato dal tuo browser (specialmente per MKV con HEVC o AC3).", "Errore Player");
     });
 
     // Show AC3 warning if it's an MKV or has AC3 in title

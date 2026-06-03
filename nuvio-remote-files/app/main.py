@@ -90,17 +90,38 @@ class ChunkedRangeStaticFiles(StaticFiles):
         if range_header.startswith("bytes="):
             try:
                 range_spec = range_header[6:]
-                s, e = range_spec.split("-")
-                start = int(s) if s else 0
-                end = int(e) if e else file_size - 1
+                if "-" in range_spec:
+                    s, e = range_spec.split("-")
+                    if s:
+                        start = int(s)
+                        if e:
+                            end = int(e)
+                    elif e:
+                        # Suffix-byte-range: last N bytes
+                        start = max(0, file_size - int(e))
                 status_code = 206
-            except Exception:
-                pass
+            except Exception as e:
+                logging.error(f"[STREAM] Error parsing range header '{range_header}': {e}")
 
+        # Assicura che i range siano validi
+        start = max(0, min(start, file_size - 1))
+        end = max(start, min(end, file_size - 1))
         content_length = end - start + 1
 
+        # Determina il content-type in base all'estensione
+        ext = os.path.splitext(full_path)[1].lower()
+        mime_types = {
+            ".mp4": "video/mp4",
+            ".mkv": "video/x-matroska",
+            ".webm": "video/webm",
+            ".avi": "video/x-msvideo",
+            ".mov": "video/quicktime",
+            ".m4v": "video/x-m4v"
+        }
+        content_type = mime_types.get(ext, "video/x-matroska")
+
         response_headers = [
-            (b"content-type", b"video/x-matroska"),
+            (b"content-type", content_type.encode()),
             (b"content-length", str(content_length).encode()),
             (b"accept-ranges", b"bytes"),
             (b"content-range", f"bytes {start}-{end}/{file_size}".encode()),
@@ -143,8 +164,8 @@ class ChunkedRangeStaticFiles(StaticFiles):
                             "more_body": (bytes_sent + len(chunk)) < content_length,
                         })
                         bytes_sent += len(chunk)
-            except Exception:
-                pass
+            except Exception as e:
+                logging.error(f"[STREAM] Error sending file {full_path}: {e}")
             finally:
                 client_disconnected.set()
 
