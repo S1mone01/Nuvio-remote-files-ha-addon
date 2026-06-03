@@ -34,6 +34,6 @@ export SERIES_DIR_NAME="${BASE_REL_PATH}/${SERIES_DIR}"
 export DOWNLOADS_DIR_NAME="${BASE_REL_PATH}/${DOWNLOADS_DIR}"
 
 # Run uvicorn
-    bashio::log.info "Avvio server FastAPI su porta ${PORT}..."
-    cd /app
-    exec uvicorn main:app --host 0.0.0.0 --port "${PORT}" --limit-concurrency 20
+bashio::log.info "Avvio server FastAPI su porta ${PORT}..."
+cd /app
+exec uvicorn main:app --host 0.0.0.0 --port "${PORT}" --limit-concurrency 8
