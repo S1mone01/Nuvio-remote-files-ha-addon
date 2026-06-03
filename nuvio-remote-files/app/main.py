@@ -13,7 +13,6 @@ from fastapi.staticfiles import StaticFiles
 from anyio import to_thread
 
 from db.init import init_db
-from core.config import REDIRECT_NAS_URL
 from api.stremio import router as stremio_router
 from api.admin import router as admin_router
 from api.auth import router as auth_router
@@ -52,19 +51,10 @@ app.include_router(admin_router)
 # Auth endpoints
 app.include_router(auth_router)
 
-# Serve static media files or redirect to NAS
-if REDIRECT_NAS_URL and REDIRECT_NAS_URL.lower() != "null":
-    @app.get("/media/{file_path:path}")
-    async def media_redirect(file_path: str):
-        """
-        Redirect media requests directly to the NAS to avoid 
-        FastAPI handling large file data in memory.
-        """
-        target_url = f"{REDIRECT_NAS_URL.rstrip('/')}/{file_path.lstrip('/')}"
-        return RedirectResponse(url=target_url, status_code=307)
-else:
-    # Mounted under /media/ to avoid shadowing API routes
-    app.mount("/media", StaticFiles(directory="/media"), name="media")
+# Serve static media files
+# Mounted under /media/ to avoid shadowing API routes
+app.mount("/media", StaticFiles(directory="/media"), name="media")
+
 
 
 # Redirect /manifest.json to internal manifest

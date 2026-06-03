@@ -29,7 +29,6 @@ options:
   media_disk_name: "EXTERNAL_USB"
   media_subpath: ""
   media_base_url: ""
-  redirect_nas_url: ""
   filter_mkv_tracks: false
 schema:
   port: port
@@ -42,5 +41,4 @@ schema:
   media_disk_name: str
   media_subpath: str?
   media_base_url: str?
-  redirect_nas_url: str?
   filter_mkv_tracks: bool

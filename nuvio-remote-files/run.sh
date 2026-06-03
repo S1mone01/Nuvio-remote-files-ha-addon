@@ -11,7 +11,6 @@ SERIES_DIR=$(bashio::config 'series_dir_name')
 DOWNLOADS_DIR=$(bashio::config 'downloads_dir_name')
 export MEDIA_DISK_NAME=$(bashio::config 'media_disk_name')
 export FILTER_MKV_TRACKS=$(bashio::config 'filter_mkv_tracks')
-export REDIRECT_NAS_URL=$(bashio::config 'redirect_nas_url')
 SUBPATH=$(bashio::config 'media_subpath')
 MEDIA_BASE_URL_CONFIG=$(bashio::config 'media_base_url')
 
