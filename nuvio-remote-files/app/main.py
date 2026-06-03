@@ -55,15 +55,13 @@ async def startup():
     gc.collect()
 
 
-# Custom StaticFiles implementation that uses a smaller chunk size (16KB vs 64KB)
-# to minimize memory spikes during concurrent range requests (seeking).
+# Custom StaticFiles implementation that uses a very small chunk size (8KB)
+# to minimize memory spikes and ensure granular range handling during seeking.
 class MemoryEfficientFileResponse(FileResponse):
-    chunk_size = 1024 * 16
+    chunk_size = 1024 * 8
 
 class MemoryEfficientStaticFiles(StaticFiles):
     def file_response(self, full_path, stat_result, scope, status_code=200):
-        # Fix: FileResponse doesn't take 'scope' in __init__.
-        # Starlette's StaticFiles uses it to handle range requests via the __call__ method of the response.
         response = MemoryEfficientFileResponse(
             full_path, stat_result=stat_result, status_code=status_code
         )
