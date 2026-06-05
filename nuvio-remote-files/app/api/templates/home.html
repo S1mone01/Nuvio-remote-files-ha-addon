@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Remote Files – Libreria</title>
+    <title>Remote Files – Home</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;400;600;700&display=swap');
 
@@ -942,9 +942,13 @@ async function checkDiskNow() {
     btn.disabled = true;
     
     try {
-        const resp = await fetch(ingressPath + '/api/check_disk', { method: 'POST' });
+        const resp = await fetch(ingressPath + '/api/check_disk', { 
+            method: 'POST',
+            signal: AbortSignal.timeout(10000) // 10s timeout
+        });
         const data = await resp.json();
-        window.location.reload();
+        // Use location.href to ensure a clean reload within the ingress context
+        window.location.href = ingressPath + '/';
     } catch (e) {
         showAlert("Errore durante il controllo disco: " + e.message);
         btn.textContent = originalText;
@@ -963,7 +967,7 @@ let sortDir      = 'desc';
 let expandedGroups = new Set();
 let seasonDataMap = new Map();
 
-const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}";
+const ingressPath = "{{ request.headers.get('X-Ingress-Path', '') }}" || (window.location.pathname.endsWith('/') ? window.location.pathname.slice(0, -1) : window.location.pathname);
 
 // ── Custom Alert ───────────────────────────────────────────────────
 function showAlert(message, title = "Notifica") {
@@ -1466,16 +1470,20 @@ async function loadFiles() {
     document.getElementById('empty').style.display = 'none';
     
     try {
-        const resp = await fetch(ingressPath + '/api/files');
-        if (!resp.ok) throw new Error(resp.statusText);
+        const resp = await fetch(ingressPath + '/api/files', {
+            signal: AbortSignal.timeout(15000) // 15s timeout
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status + ": " + resp.statusText);
         const data = await resp.json();
         allFiles = data.files || [];
         updateStats(data);
         render();
     } catch (e) {
+        console.error("Load files error:", e);
         document.getElementById('loading').innerHTML =
             `<div style="color:var(--warn);text-align:center;padding:60px">
-                Errore nel caricamento: ${e.message}
+                Errore nel caricamento: ${e.message}<br>
+                <button onclick="loadFiles()" class="filter-btn" style="margin-top:10px">Riprova</button>
             </div>`;
     }
 }
@@ -1486,15 +1494,19 @@ async function loadDownloads() {
     document.getElementById('empty-downloads').style.display = 'none';
     
     try {
-        const resp = await fetch(ingressPath + '/api/downloads');
-        if (!resp.ok) throw new Error(resp.statusText);
+        const resp = await fetch(ingressPath + '/api/downloads', {
+            signal: AbortSignal.timeout(15000) // 15s timeout
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status + ": " + resp.statusText);
         const data = await resp.json();
         downloads = data.files || [];
         renderDownloads();
     } catch (e) {
+        console.error("Load downloads error:", e);
         document.getElementById('loading-downloads').innerHTML =
             `<div style="color:var(--warn);text-align:center;padding:60px">
-                Errore nel caricamento: ${e.message}
+                Errore nel caricamento: ${e.message}<br>
+                <button onclick="loadDownloads()" class="filter-btn" style="margin-top:10px">Riprova</button>
             </div>`;
     }
 }

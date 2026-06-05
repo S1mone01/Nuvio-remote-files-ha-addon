@@ -29,21 +29,21 @@ router = APIRouter()
 templates = Jinja2Templates(directory="api/templates")
 
 
-# ── File browser UI ───────────────────────────────────────────────────
+# ── Home UI ───────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
-def files_page(request: Request):
-    """Human-friendly file browser: shows all indexed files and total size."""
+def home_page(request: Request):
+    """Human-friendly home page: shows all indexed files and total size."""
     return templates.TemplateResponse(
         request=request,
-        name="files.html",
+        name="home.html",
         context={"disk_status": get_cached_disk_status()}
     )
 
 
-@router.get("/files")
-def files_redirect(request: Request):
-    """Redirect /files to root for consistency."""
+@router.get("/home")
+def home_redirect(request: Request):
+    """Redirect /home to root for consistency."""
     ingress_path = request.headers.get("X-Ingress-Path", "")
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=f"{ingress_path}/")
@@ -59,7 +59,7 @@ def api_check_disk():
 @router.get("/api/files")
 def api_files():
     """
-    JSON endpoint consumed by the /files UI.
+    JSON endpoint consumed by the home UI.
 
     Returns a flat list of all indexed files, with type, title, path,
     resolution, size, and (for episodes) season/episode numbers.
@@ -537,20 +537,6 @@ async def admin_file_tracks_update(request: Request):
         return {"status": "error", "message": str(e)}
 
 
-# ── Admin pages ──────────────────────────────────────────────────────
-
-# These pages are intentionally unauthenticated.
-# All privileged actions are protected by token checks on POST routes.
-@router.get("/admin", response_class=HTMLResponse)
-def admin_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="admin.html",
-        context={"disk_status": get_cached_disk_status()}
-    )
-
-
-
 @router.post("/admin/scan")
 def admin_scan(request: Request):
     scan_movies()
@@ -578,22 +564,3 @@ def admin_scan_rebuild(request: Request):
         "status": "ok",
         "mode": "rebuild"
     }
-
-
-# Configuration / install UI.
-#
-# These endpoints intentionally return a human-friendly HTML page.
-# The same page is used for:
-# - initial addon installation
-# - the Stremio ⚙️ configure action (internal and external)
-#
-# Access control for streaming is enforced via tokenized stream endpoints
-# and proxy-level checks, not via the configure page itself.
-@router.get("/internal/configure", response_class=HTMLResponse)
-@router.get("/external/configure", response_class=HTMLResponse)
-def configure_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="configure.html",
-        context={"disk_status": get_cached_disk_status()}
-    )
