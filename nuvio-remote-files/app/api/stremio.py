@@ -94,9 +94,6 @@ def catalog_movies(request: Request):
     if external and not valid_stream_token(request):
         return {"metas": []}
 
-    if not is_disk_online():
-        return {"metas": []}
-
     with sqlite3.connect(DB_PATH) as conn:
         return {"metas": get_movie_catalog(conn)}
 
@@ -108,9 +105,6 @@ def catalog_series(request: Request):
 
     # External requests fail closed with empty catalog
     if external and not valid_stream_token(request):
-        return {"metas": []}
-
-    if not is_disk_online():
         return {"metas": []}
 
     with sqlite3.connect(DB_PATH) as conn:
@@ -241,7 +235,7 @@ def manifest_internal():
     return {
         "id": "org.remote-files.internal",
         "name": "Remote Files (Internal)",
-        "version": "1.4.2",
+        "version": "2.2.0",
         "description": "Browse and play your own media over LAN or VPN",
         "behaviorHints": {
             "configurable": True,
@@ -277,7 +271,7 @@ def manifest_external():
     return {
         "id": "org.remote-files.external",
         "name": "Remote Files (External)",
-        "version": "1.4.2",
+        "version": "2.2.0",
         "description": "Browse and play your own media over the internet using HTTPS",
         "behaviorHints": {
             "configurable": True,

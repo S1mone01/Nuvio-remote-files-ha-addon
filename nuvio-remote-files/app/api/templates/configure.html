@@ -99,11 +99,15 @@
 <body>
 <div class="container">
     <h1>Install Remote Files Addon
-        <div class="status-indicator">
-            <div class="status-dot {% if disk_online %}status-online{% else %}status-offline{% endif %}"></div>
-            <span class="{% if disk_online %}status-text-online{% else %}status-text-offline{% endif %}">
-                {% if disk_online %}online{% else %}offline{% endif %}
+        <div class="status-indicator" id="disk-status-container">
+            <div class="status-dot {% if disk_status.online %}status-online{% else %}status-offline{% endif %}"></div>
+            <span class="{% if disk_status.online %}status-text-online{% else %}status-text-offline{% endif %}">
+                {% if disk_status.online %}online{% else %}offline{% endif %}
             </span>
+            <span style="font-size: 0.65rem; color: #64748b; border-left: 1px solid #e2e8f0; padding-left: 8px; margin-left: 8px; margin-right: 8px; text-transform: none;">
+                Ultimo check: {{ disk_status.last_check }}
+            </span>
+            <button onclick="checkDiskNow()" style="padding: 2px 8px; font-size: 0.6rem;">Controlla</button>
         </div>
     </h1>
 
@@ -142,6 +146,22 @@ const isExternal = mode === "external";
 const baseInput = document.getElementById("base");
 const base_path = "{{ request.headers.get('X-Ingress-Path', '') }}";
 baseInput.value = window.location.origin + base_path;
+
+async function checkDiskNow() {
+    const btn = document.querySelector('#disk-status-container button');
+    const originalText = btn.textContent;
+    btn.textContent = '...';
+    btn.disabled = true;
+    
+    try {
+        const res = await fetch(base_path + "/api/check_disk", { method: 'POST' });
+        window.location.reload();
+    } catch (e) {
+        showAlert("Errore durante il controllo disco: " + e.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
 
 if (isExternal) {
     document.getElementById("token-block").style.display = "block";

@@ -21,7 +21,7 @@ import logging
 from scanner import scan_movies, scan_series
 from scanner.organizer import organize_downloads
 from scanner.ffmpeg_utils import filter_existing_library, FILTERING_STATUS
-from core.config import DB_PATH, is_disk_online
+from core.config import DB_PATH, is_disk_online, get_cached_disk_status
 from core.auth import require_admin_token
 
 router = APIRouter()
@@ -37,8 +37,15 @@ def files_page(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="files.html",
-        context={"disk_online": is_disk_online()}
+        context={"disk_status": get_cached_disk_status()}
     )
+
+
+@router.post("/api/check_disk")
+def api_check_disk():
+    """Manual disk check trigger."""
+    online = is_disk_online()
+    return {"status": "ok", "online": online}
 
 
 @router.get("/api/files")
@@ -526,13 +533,14 @@ async def admin_file_tracks_update(request: Request):
 
 # These pages are intentionally unauthenticated.
 # All privileged actions are protected by token checks on POST routes.
-@router.get("/admin", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 def admin_page(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="admin.html",
-        context={"disk_online": is_disk_online()}
+        context={"disk_status": get_cached_disk_status()}
     )
+
 
 
 @router.post("/admin/scan")
@@ -579,5 +587,5 @@ def configure_page(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="configure.html",
-        context={"disk_online": is_disk_online()}
+        context={"disk_status": get_cached_disk_status()}
     )

@@ -86,3 +86,18 @@ CREATE INDEX IF NOT EXISTS idx_files_episode
 -- Fast episode resolution from Stremio IDs
 CREATE INDEX IF NOT EXISTS idx_episodes_lookup
   ON episodes(series_imdb_id, season, episode);
+
+
+-- ----------------------------
+-- System State
+-- ----------------------------
+-- Stores transient system state like disk status and last check date
+CREATE TABLE IF NOT EXISTS system_state (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Initialize disk status if not present
+INSERT OR IGNORE INTO system_state (key, value) VALUES ('disk_online', 'false');
+INSERT OR IGNORE INTO system_state (key, value) VALUES ('last_disk_check', 'Mai controllato');

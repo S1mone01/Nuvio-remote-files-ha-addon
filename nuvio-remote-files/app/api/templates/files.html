@@ -601,11 +601,15 @@
 
 <header>
     <div class="logo">Remote<span>Files</span></div>
-    <div class="status-indicator">
-        <div class="status-dot {% if disk_online %}status-online{% else %}status-offline{% endif %}"></div>
-        <span class="{% if disk_online %}status-text-online{% else %}status-text-offline{% endif %}">
-            {% if disk_online %}online{% else %}offline{% endif %}
+    <div class="status-indicator" id="disk-status-container">
+        <div class="status-dot {% if disk_status.online %}status-online{% else %}status-offline{% endif %}"></div>
+        <span class="{% if disk_status.online %}status-text-online{% else %}status-text-offline{% endif %}">
+            {% if disk_status.online %}online{% else %}offline{% endif %}
         </span>
+        <span style="font-size: 0.65rem; color: var(--muted); border-left: 1px solid var(--border); padding-left: 8px; margin-left: 8px; margin-right: 8px; text-transform: none;">
+            Ultimo check: {{ disk_status.last_check }}
+        </span>
+        <button onclick="checkDiskNow()" class="copy-btn" style="padding: 2px 8px; font-size: 0.6rem; height: 20px; text-transform: none;">Controlla</button>
     </div>
     <nav>
         <a id="nav-library" onclick="showTab('library')" class="active">Libreria</a>
@@ -931,6 +935,23 @@
 
 <script>
 // ... (keep existing state)
+async function checkDiskNow() {
+    const btn = document.querySelector('#disk-status-container button');
+    const originalText = btn.textContent;
+    btn.textContent = '...';
+    btn.disabled = true;
+    
+    try {
+        const resp = await fetch(ingressPath + '/api/check_disk', { method: 'POST' });
+        const data = await resp.json();
+        window.location.reload();
+    } catch (e) {
+        showAlert("Errore durante il controllo disco: " + e.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
 // ── State ──────────────────────────────────────────────────────────
 let allFiles   = [];
 let downloads  = [];
