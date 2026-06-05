@@ -189,16 +189,8 @@ app.include_router(auth_router)
 app.mount("/media", ChunkedRangeStaticFiles(directory="/media"), name="media")
 
 
-
 # Redirect /manifest.json to internal manifest
 @app.get("/manifest.json")
 def manifest_redirect(request: Request):
     ingress_path = request.headers.get("X-Ingress-Path", "")
     return RedirectResponse(url=f"{ingress_path}/internal/manifest.json")
-
-# Redirect root to file browser (already covered by admin_router's @router.get("/") if we add it)
-# Or just define it here.
-@app.get("/")
-def root(request: Request):
-    ingress_path = request.headers.get("X-Ingress-Path", "")
-    return RedirectResponse(url=f"{ingress_path}/files")

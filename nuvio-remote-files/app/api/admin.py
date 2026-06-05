@@ -31,7 +31,7 @@ templates = Jinja2Templates(directory="api/templates")
 
 # ── File browser UI ───────────────────────────────────────────────────
 
-@router.get("/files", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 def files_page(request: Request):
     """Human-friendly file browser: shows all indexed files and total size."""
     return templates.TemplateResponse(
@@ -39,6 +39,14 @@ def files_page(request: Request):
         name="files.html",
         context={"disk_status": get_cached_disk_status()}
     )
+
+
+@router.get("/files")
+def files_redirect(request: Request):
+    """Redirect /files to root for consistency."""
+    ingress_path = request.headers.get("X-Ingress-Path", "")
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"{ingress_path}/")
 
 
 @router.post("/api/check_disk")
@@ -533,7 +541,7 @@ async def admin_file_tracks_update(request: Request):
 
 # These pages are intentionally unauthenticated.
 # All privileged actions are protected by token checks on POST routes.
-@router.get("/", response_class=HTMLResponse)
+@router.get("/admin", response_class=HTMLResponse)
 def admin_page(request: Request):
     return templates.TemplateResponse(
         request=request,
